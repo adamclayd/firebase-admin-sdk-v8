@@ -9,9 +9,10 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 
 ## ✨ Features
 
-- ✅ **No Node.js Dependencies** - Pure Web APIs (crypto.subtle, fetch)
+- ✅ **Zero Dependencies** - No external dependencies, pure Web APIs (crypto.subtle, fetch)
 - ✅ **JWT Token Generation** - Service account authentication
-- ✅ **ID Token Verification** - Verify Firebase ID tokens
+- ✅ **ID Token Verification** - Verify Firebase ID tokens (supports v9 and v10 formats)
+- ✅ **Firebase v10 Compatible** - Supports both old and new token issuer formats
 - ✅ **Firestore REST API** - Full CRUD operations via REST
 - ✅ **Field Value Operations** - increment, arrayUnion, arrayRemove, serverTimestamp, delete
 - ✅ **Advanced Queries** - where, orderBy, limit, offset, cursor pagination
