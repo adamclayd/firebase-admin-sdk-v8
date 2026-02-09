@@ -38,7 +38,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "firebase-auth-cloudflare-workers": "^1.0.0"
+    "firebase-auth-cloudflare-workers": "^2.0.6"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
