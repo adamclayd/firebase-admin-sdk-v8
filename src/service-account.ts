@@ -15,7 +15,8 @@ export function getServiceAccount(): ServiceAccount {
   if (!key) {
     throw new Error(
       'FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY environment variable is not set. ' +
-      'Please provide your Firebase service account JSON as a string.'
+      'Please provide your Firebase service account JSON as a string. ' +
+      'Example: FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY=\'{"type":"service_account",...}\''
     );
   }
 
@@ -53,16 +54,20 @@ export function getServiceAccount(): ServiceAccount {
 
 /**
  * Get Firebase project ID from environment
- * @throws {Error} If PUBLIC_FIREBASE_PROJECT_ID is not set
+ * Checks multiple possible environment variable names
+ * @throws {Error} If no project ID is found
  * @returns {string} Firebase project ID
  */
 export function getProjectId(): string {
-  const projectId = process.env.PUBLIC_FIREBASE_PROJECT_ID;
+  // Check multiple possible environment variable names
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.PUBLIC_FIREBASE_PROJECT_ID;
   
   if (!projectId) {
     throw new Error(
-      'PUBLIC_FIREBASE_PROJECT_ID environment variable is not set. ' +
-      'Please provide your Firebase project ID.'
+      'Firebase project ID not found. Please set one of: ' +
+      'FIREBASE_PROJECT_ID or PUBLIC_FIREBASE_PROJECT_ID'
     );
   }
   

@@ -32,12 +32,25 @@ npm install firebase-admin-sdk-v8
 ### 1. Set Environment Variables
 
 ```env
-# Firebase Admin Service Account (JSON string)
+# Firebase Admin Service Account (JSON string) - REQUIRED
 FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}'
 
-# Firebase Project ID
+# Firebase Project ID - REQUIRED (use either variable name)
+FIREBASE_PROJECT_ID=your-project-id
+# OR
 PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+
+# Optional: Standard Firebase client config (for reference)
+FIREBASE_API_KEY=your-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+FIREBASE_APP_ID=your-app-id
 ```
+
+**Required Environment Variables:**
+- `FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY` - Your Firebase service account JSON (as a string)
+- `FIREBASE_PROJECT_ID` or `PUBLIC_FIREBASE_PROJECT_ID` - Your Firebase project ID
 
 ### 2. Verify ID Tokens
 
