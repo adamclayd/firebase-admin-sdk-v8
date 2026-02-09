@@ -5,6 +5,7 @@
 
 import type { DecodedIdToken, UserInfo } from './types';
 import { getProjectId } from './service-account';
+import { importPublicKeyFromX509 } from './x509';
 
 /**
  * JWT header structure
@@ -73,26 +74,6 @@ function parseJWT(token: string): { header: JWTHeader; payload: any } {
   return { header, payload };
 }
 
-/**
- * Import public key from PEM format
- */
-async function importPublicKey(pem: string): Promise<CryptoKey> {
-  // Remove PEM header/footer and whitespace
-  const pemContents = pem
-    .replace('-----BEGIN CERTIFICATE-----', '')
-    .replace('-----END CERTIFICATE-----', '')
-    .replace(/\s/g, '');
-  
-  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-  
-  return await crypto.subtle.importKey(
-    'spki',
-    binaryDer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-}
 
 /**
  * Verify JWT signature
@@ -203,7 +184,7 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
       );
     }
 
-    const publicKey = await importPublicKey(publicKeyPem);
+    const publicKey = await importPublicKeyFromX509(publicKeyPem);
     const isValid = await verifySignature(idToken, publicKey);
 
     if (!isValid) {
