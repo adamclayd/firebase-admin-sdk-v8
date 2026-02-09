@@ -171,17 +171,27 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
     }
 
     // Fetch public keys and verify signature
-    const publicKeys = await fetchPublicKeys();
-    const publicKeyPem = publicKeys[header.kid];
+    let publicKeys = await fetchPublicKeys();
+    let publicKeyPem = publicKeys[header.kid];
 
+    // If key not found, it might have rotated - clear cache and retry once
     if (!publicKeyPem) {
-      // Log available keys for debugging
-      const availableKids = Object.keys(publicKeys).join(', ');
-      throw new Error(
-        `Public key not found for kid: ${header.kid}. ` +
-        `Available kids: ${availableKids}. ` +
-        `This might indicate a key rotation issue or the token is from a different Firebase project.`
-      );
+      console.log(`[verifyIdToken] Key ${header.kid} not found in cache, refreshing keys...`);
+      publicKeysCache = null;
+      publicKeysCacheExpiry = 0;
+      
+      publicKeys = await fetchPublicKeys();
+      publicKeyPem = publicKeys[header.kid];
+      
+      if (!publicKeyPem) {
+        // Still not found after refresh
+        const availableKids = Object.keys(publicKeys).join(', ');
+        throw new Error(
+          `Public key not found for kid: ${header.kid}. ` +
+          `Available kids: ${availableKids}. ` +
+          `This might indicate the token is from a different Firebase project or was signed with a very old key.`
+        );
+      }
     }
 
     const publicKey = await importPublicKeyFromX509(publicKeyPem);
