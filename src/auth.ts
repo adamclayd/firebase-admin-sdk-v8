@@ -194,7 +194,13 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
     const publicKeyPem = publicKeys[header.kid];
 
     if (!publicKeyPem) {
-      throw new Error('Public key not found for kid: ' + header.kid);
+      // Log available keys for debugging
+      const availableKids = Object.keys(publicKeys).join(', ');
+      throw new Error(
+        `Public key not found for kid: ${header.kid}. ` +
+        `Available kids: ${availableKids}. ` +
+        `This might indicate a key rotation issue or the token is from a different Firebase project.`
+      );
     }
 
     const publicKey = await importPublicKey(publicKeyPem);
