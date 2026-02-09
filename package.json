@@ -5,6 +5,14 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prmichaelsen/firebase-admin-sdk-v8"
+  },
+  "bugs": {
+    "url": "https://github.com/prmichaelsen/firebase-admin-sdk-v8/issues"
+  },
+  "homepage": "https://github.com/prmichaelsen/firebase-admin-sdk-v8#readme",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
