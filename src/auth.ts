@@ -24,25 +24,35 @@ let publicKeysCacheExpiry: number = 0;
 
 /**
  * Fetch Google's public keys for Firebase token verification
+ * Supports both securetoken (v9) and session (v10) endpoints
  */
-async function fetchPublicKeys(): Promise<Record<string, string>> {
+async function fetchPublicKeys(issuer?: string): Promise<Record<string, string>> {
+  // Determine which endpoint to use based on issuer
+  let endpoint = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+  
+  // For Firebase v10 session tokens, use the session endpoint
+  if (issuer && issuer.includes('session.firebase.google.com')) {
+    endpoint = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys';
+  }
+  
   // Return cached keys if still valid
   if (publicKeysCache && Date.now() < publicKeysCacheExpiry) {
     return publicKeysCache;
   }
 
-  const response = await fetch(
-    'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
-  );
+  console.log(`[fetchPublicKeys] Fetching from: ${endpoint}`);
+  const response = await fetch(endpoint);
 
   if (!response.ok) {
-    throw new Error('Failed to fetch Firebase public keys');
+    throw new Error(`Failed to fetch Firebase public keys from ${endpoint}`);
   }
 
   publicKeysCache = await response.json();
   
   // Cache for 1 hour (keys rotate every 24 hours)
   publicKeysCacheExpiry = Date.now() + 3600000;
+  
+  console.log(`[fetchPublicKeys] Fetched ${Object.keys(publicKeysCache || {}).length} keys`);
   
   return publicKeysCache!;
 }
@@ -170,8 +180,8 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
       throw new Error('Subject too long');
     }
 
-    // Fetch public keys and verify signature
-    let publicKeys = await fetchPublicKeys();
+    // Fetch public keys and verify signature (pass issuer to get correct endpoint)
+    let publicKeys = await fetchPublicKeys(payload.iss);
     let publicKeyPem = publicKeys[header.kid];
 
     // If key not found, it might have rotated - clear cache and retry once
@@ -180,7 +190,7 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
       publicKeysCache = null;
       publicKeysCacheExpiry = 0;
       
-      publicKeys = await fetchPublicKeys();
+      publicKeys = await fetchPublicKeys(payload.iss);
       publicKeyPem = publicKeys[header.kid];
       
       if (!publicKeyPem) {
