@@ -1,0 +1,756 @@
+/**
+ * Firebase Admin SDK v8 - Firestore REST API
+ * Provides CRUD operations for Firestore using REST API
+ */
+
+import type {
+  DataObject,
+  FirestoreValue,
+  FirestoreDocument,
+  SetOptions,
+  QueryOptions,
+  QueryFilter,
+  BatchWrite,
+  BatchWriteResult,
+} from './types';
+import { getAdminAccessToken } from './token-generation';
+import { getProjectId } from './service-account';
+import { isFieldValue } from './field-value';
+
+const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
+
+/**
+ * Convert JavaScript value to Firestore format
+ */
+function toFirestoreValue(value: any): FirestoreValue {
+  if (value === null || value === undefined) {
+    return { nullValue: null };
+  }
+
+  // Handle FieldValue sentinels
+  if (isFieldValue(value)) {
+    switch (value._type) {
+      case 'serverTimestamp':
+        return { timestampValue: 'REQUEST_TIME' } as any;
+      case 'increment':
+        return {
+          integerValue: String(value._value || 0),
+        } as any; // Will be handled with transforms
+      case 'arrayUnion':
+      case 'arrayRemove':
+      case 'delete':
+        // These need special handling in the request
+        return value as any;
+      default:
+        throw new Error(`Unknown FieldValue type: ${value._type}`);
+    }
+  }
+  
+  if (typeof value === 'string') {
+    return { stringValue: value };
+  }
+  
+  if (typeof value === 'boolean') {
+    return { booleanValue: value };
+  }
+  
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) {
+      return { integerValue: String(value) };
+    }
+    return { doubleValue: value };
+  }
+  
+  if (value instanceof Date) {
+    return { timestampValue: value.toISOString() };
+  }
+  
+  if (Array.isArray(value)) {
+    return {
+      arrayValue: {
+        values: value.map(v => toFirestoreValue(v))
+      }
+    };
+  }
+  
+  if (typeof value === 'object') {
+    return {
+      mapValue: {
+        fields: convertToFirestoreFormat(value)
+      }
+    };
+  }
+  
+  throw new Error(`Unsupported value type: ${typeof value}`);
+}
+
+/**
+ * Convert JavaScript object to Firestore format
+ */
+function convertToFirestoreFormat(data: DataObject): Record<string, FirestoreValue> {
+  const result: Record<string, FirestoreValue> = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    result[key] = toFirestoreValue(value);
+  }
+  
+  return result;
+}
+
+/**
+ * Extract field transforms from data (for increment, arrayUnion, etc.)
+ */
+function extractFieldTransforms(data: DataObject, fieldPrefix = ''): any[] {
+  const transforms: any[] = [];
+  
+  for (const [key, value] of Object.entries(data)) {
+    const fieldPath = fieldPrefix ? `${fieldPrefix}.${key}` : key;
+    
+    if (isFieldValue(value)) {
+      switch (value._type) {
+        case 'serverTimestamp':
+          transforms.push({
+            fieldPath,
+            setToServerValue: 'REQUEST_TIME',
+          });
+          break;
+        case 'increment':
+          transforms.push({
+            fieldPath,
+            increment: toFirestoreValue(value._value),
+          });
+          break;
+        case 'arrayUnion':
+          transforms.push({
+            fieldPath,
+            appendMissingElements: {
+              values: value._value.map((v: any) => toFirestoreValue(v)),
+            },
+          });
+          break;
+        case 'arrayRemove':
+          transforms.push({
+            fieldPath,
+            removeAllFromArray: {
+              values: value._value.map((v: any) => toFirestoreValue(v)),
+            },
+          });
+          break;
+      }
+    }
+  }
+  
+  return transforms;
+}
+
+/**
+ * Remove FieldValue sentinels from data (they're handled via transforms)
+ */
+function removeFieldTransforms(data: DataObject): DataObject {
+  const result: DataObject = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (isFieldValue(value)) {
+      if (value._type === 'delete') {
+        // Skip delete fields - they're handled via updateMask
+        continue;
+      }
+      // Skip transform fields - they're handled separately
+      continue;
+    }
+    result[key] = value;
+  }
+  
+  return result;
+}
+
+/**
+ * Convert Firestore value to JavaScript value
+ */
+function fromFirestoreValue(value: FirestoreValue): any {
+  if ('stringValue' in value) {
+    return value.stringValue;
+  }
+  
+  if ('integerValue' in value) {
+    return parseInt(value.integerValue, 10);
+  }
+  
+  if ('doubleValue' in value) {
+    return value.doubleValue;
+  }
+  
+  if ('booleanValue' in value) {
+    return value.booleanValue;
+  }
+  
+  if ('nullValue' in value) {
+    return null;
+  }
+  
+  if ('timestampValue' in value) {
+    return new Date(value.timestampValue);
+  }
+  
+  if ('arrayValue' in value) {
+    return (value.arrayValue.values || []).map(v => fromFirestoreValue(v));
+  }
+  
+  if ('mapValue' in value) {
+    return convertFromFirestoreFormat(value.mapValue.fields || {});
+  }
+  
+  return null;
+}
+
+/**
+ * Convert Firestore format to JavaScript object
+ */
+function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): DataObject {
+  const result: DataObject = {};
+  
+  for (const [key, value] of Object.entries(fields)) {
+    result[key] = fromFirestoreValue(value);
+  }
+  
+  return result;
+}
+
+/**
+ * Build query body for structured queries
+ */
+function buildStructuredQuery(collectionPath: string, options?: QueryOptions): any {
+  const query: any = {
+    from: [{ collectionId: collectionPath.split('/').pop() }],
+  };
+
+  if (options?.where && options.where.length > 0) {
+    const filters = options.where.map((filter: QueryFilter) => ({
+      fieldFilter: {
+        field: { fieldPath: filter.field },
+        op: mapWhereOp(filter.op),
+        value: toFirestoreValue(filter.value),
+      },
+    }));
+
+    if (filters.length === 1) {
+      query.where = filters[0];
+    } else {
+      query.where = {
+        compositeFilter: {
+          op: 'AND',
+          filters,
+        },
+      };
+    }
+  }
+
+  if (options?.orderBy && options.orderBy.length > 0) {
+    query.orderBy = options.orderBy.map(order => ({
+      field: { fieldPath: order.field },
+      direction: order.direction,
+    }));
+  }
+
+  if (options?.limit) {
+    query.limit = options.limit;
+  }
+
+  if (options?.offset) {
+    query.offset = options.offset;
+  }
+
+  if (options?.startAt) {
+    query.startAt = {
+      values: options.startAt.map(v => toFirestoreValue(v)),
+      before: true,
+    };
+  }
+
+  if (options?.startAfter) {
+    query.startAt = {
+      values: options.startAfter.map(v => toFirestoreValue(v)),
+      before: false,
+    };
+  }
+
+  if (options?.endAt) {
+    query.endAt = {
+      values: options.endAt.map(v => toFirestoreValue(v)),
+      before: false,
+    };
+  }
+
+  if (options?.endBefore) {
+    query.endAt = {
+      values: options.endBefore.map(v => toFirestoreValue(v)),
+      before: true,
+    };
+  }
+
+  return query;
+}
+
+/**
+ * Map query operators to Firestore REST API format
+ */
+function mapWhereOp(op: string): string {
+  const opMap: Record<string, string> = {
+    '<': 'LESS_THAN',
+    '<=': 'LESS_THAN_OR_EQUAL',
+    '==': 'EQUAL',
+    '!=': 'NOT_EQUAL',
+    '>=': 'GREATER_THAN_OR_EQUAL',
+    '>': 'GREATER_THAN',
+    'array-contains': 'ARRAY_CONTAINS',
+    'array-contains-any': 'ARRAY_CONTAINS_ANY',
+    'in': 'IN',
+    'not-in': 'NOT_IN',
+  };
+  return opMap[op] || 'EQUAL';
+}
+
+/**
+ * Set a document in Firestore (create or overwrite)
+ * 
+ * @param {string} collectionPath - Collection path
+ * @param {string} documentId - Document ID
+ * @param {DataObject} data - Document data
+ * @param {SetOptions} [options] - Set options (merge, mergeFields)
+ * @returns {Promise<void>}
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * // Overwrite document
+ * await setDocument('users', 'user123', { name: 'John', age: 30 });
+ * 
+ * // Merge with existing document
+ * await setDocument('users', 'user123', { age: 31 }, { merge: true });
+ * 
+ * // Merge specific fields
+ * await setDocument('users', 'user123', { age: 31, city: 'NYC' }, { mergeFields: ['age'] });
+ * ```
+ */
+export async function setDocument(
+  collectionPath: string,
+  documentId: string,
+  data: DataObject,
+  options?: SetOptions
+): Promise<void> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  
+  const cleanData = removeFieldTransforms(data);
+  const firestoreData = convertToFirestoreFormat(cleanData);
+  const transforms = extractFieldTransforms(data);
+  
+  const body: any = { fields: firestoreData };
+  
+  let queryParams = '';
+  
+  if (options?.merge) {
+    // Merge all fields
+    queryParams = '?updateMask.fieldPaths=*';
+  } else if (options?.mergeFields && options.mergeFields.length > 0) {
+    // Merge specific fields
+    const fieldPaths = options.mergeFields.join('&updateMask.fieldPaths=');
+    queryParams = `?updateMask.fieldPaths=${fieldPaths}`;
+  }
+  
+  // Add field transforms if any
+  if (transforms.length > 0) {
+    body.transforms = transforms;
+  }
+  
+  const response = await fetch(`${url}${queryParams}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to set document: ${errorText}`);
+  }
+}
+
+/**
+ * Add a document to Firestore collection
+ * 
+ * @param {string} collectionPath - Collection path (e.g., 'users' or 'users/uid/posts')
+ * @param {DataObject} data - Document data
+ * @param {string} [documentId] - Optional document ID (auto-generated if not provided)
+ * @returns {Promise<string>} Created document ID
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * const docId = await addDocument('users', {
+ *   name: 'John Doe',
+ *   email: 'john@example.com',
+ *   createdAt: new Date()
+ * });
+ * ```
+ */
+export async function addDocument(
+  collectionPath: string,
+  data: DataObject,
+  documentId?: string
+): Promise<string> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const baseUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}`;
+  const url = documentId ? `${baseUrl}?documentId=${documentId}` : baseUrl;
+  
+  const cleanData = removeFieldTransforms(data);
+  const firestoreData = convertToFirestoreFormat(cleanData);
+  const transforms = extractFieldTransforms(data);
+  
+  const body: any = { fields: firestoreData };
+  
+  if (transforms.length > 0) {
+    body.transforms = transforms;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to add document: ${errorText}`);
+  }
+  
+  const result = await response.json() as FirestoreDocument;
+  return result.name.split('/').pop()!;
+}
+
+/**
+ * Get a document from Firestore
+ * 
+ * @param {string} collectionPath - Collection path
+ * @param {string} documentId - Document ID
+ * @returns {Promise<DataObject | null>} Document data or null if not found
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * const user = await getDocument('users', 'user123');
+ * if (user) {
+ *   console.log('User:', user.name);
+ * }
+ * ```
+ */
+export async function getDocument(
+  collectionPath: string,
+  documentId: string
+): Promise<DataObject | null> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+  
+  if (response.status === 404) {
+    return null;
+  }
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get document: ${errorText}`);
+  }
+  
+  const result = await response.json() as FirestoreDocument;
+  return convertFromFirestoreFormat(result.fields);
+}
+
+/**
+ * Update a document in Firestore
+ * 
+ * @param {string} collectionPath - Collection path
+ * @param {string} documentId - Document ID
+ * @param {DataObject} data - Data to update
+ * @returns {Promise<void>}
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * await updateDocument('users', 'user123', {
+ *   lastLogin: new Date(),
+ *   loginCount: FieldValue.increment(1)
+ * });
+ * ```
+ */
+export async function updateDocument(
+  collectionPath: string,
+  documentId: string,
+  data: DataObject
+): Promise<void> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  
+  const cleanData = removeFieldTransforms(data);
+  const firestoreData = convertToFirestoreFormat(cleanData);
+  const transforms = extractFieldTransforms(data);
+  
+  // Build update mask (exclude deleted fields)
+  const updateMask = Object.keys(data)
+    .filter(key => !isFieldValue(data[key]) || data[key]._type !== 'delete')
+    .join(',');
+  
+  const body: any = { fields: firestoreData };
+  
+  if (transforms.length > 0) {
+    body.transforms = transforms;
+  }
+  
+  const response = await fetch(`${url}?updateMask.fieldPaths=${updateMask}&currentDocument.exists=true`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update document: ${errorText}`);
+  }
+}
+
+/**
+ * Delete a document from Firestore
+ * 
+ * @param {string} collectionPath - Collection path
+ * @param {string} documentId - Document ID
+ * @returns {Promise<void>}
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * await deleteDocument('users', 'user123');
+ * ```
+ */
+export async function deleteDocument(
+  collectionPath: string,
+  documentId: string
+): Promise<void> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete document: ${errorText}`);
+  }
+}
+
+/**
+ * Query documents in a collection with advanced filtering
+ * 
+ * @param {string} collectionPath - Collection path
+ * @param {QueryOptions} [options] - Query options (where, orderBy, limit, etc.)
+ * @returns {Promise<Array<{ id: string; data: DataObject }>>} Array of documents
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * const activeUsers = await queryDocuments('users', {
+ *   where: [
+ *     { field: 'active', op: '==', value: true },
+ *     { field: 'age', op: '>=', value: 18 }
+ *   ],
+ *   orderBy: [{ field: 'name', direction: 'ASCENDING' }],
+ *   limit: 10
+ * });
+ * ```
+ */
+export async function queryDocuments(
+  collectionPath: string,
+  options?: QueryOptions
+): Promise<Array<{ id: string; data: DataObject }>> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  // If no query options, use simple list
+  if (!options || Object.keys(options).length === 0) {
+    const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to query documents: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const documents = result.documents || [];
+    
+    return documents.map((doc: FirestoreDocument) => ({
+      id: doc.name.split('/').pop()!,
+      data: convertFromFirestoreFormat(doc.fields),
+    }));
+  }
+  
+  // Use structured query for advanced filtering
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:runQuery`;
+  
+  const structuredQuery = buildStructuredQuery(collectionPath, options);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ structuredQuery }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to query documents: ${errorText}`);
+  }
+  
+  const results = await response.json();
+  
+  return results
+    .filter((result: any) => result.document)
+    .map((result: any) => ({
+      id: result.document.name.split('/').pop()!,
+      data: convertFromFirestoreFormat(result.document.fields),
+    }));
+}
+
+/**
+ * Perform batch write operations (set, update, delete)
+ * 
+ * @param {BatchWrite[]} operations - Array of batch operations
+ * @returns {Promise<BatchWriteResult>} Batch write result
+ * @throws {Error} If the operation fails
+ * 
+ * @example
+ * ```typescript
+ * await batchWrite([
+ *   { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
+ *   { type: 'update', collectionPath: 'users', documentId: 'user2', data: { age: 31 } },
+ *   { type: 'delete', collectionPath: 'users', documentId: 'user3' }
+ * ]);
+ * ```
+ */
+export async function batchWrite(operations: BatchWrite[]): Promise<BatchWriteResult> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:commit`;
+  
+  const writes = operations.map(op => {
+    const docPath = `projects/${projectId}/databases/(default)/documents/${op.collectionPath}/${op.documentId}`;
+    
+    switch (op.type) {
+      case 'set': {
+        const cleanData = removeFieldTransforms(op.data!);
+        const firestoreData = convertToFirestoreFormat(cleanData);
+        const transforms = extractFieldTransforms(op.data!);
+        
+        const write: any = {
+          update: {
+            name: docPath,
+            fields: firestoreData,
+          },
+        };
+        
+        if (op.options?.merge) {
+          write.updateMask = { fieldPaths: ['*'] };
+        } else if (op.options?.mergeFields) {
+          write.updateMask = { fieldPaths: op.options.mergeFields };
+        }
+        
+        if (transforms.length > 0) {
+          write.updateTransforms = transforms;
+        }
+        
+        return write;
+      }
+      
+      case 'update': {
+        const cleanData = removeFieldTransforms(op.data!);
+        const firestoreData = convertToFirestoreFormat(cleanData);
+        const transforms = extractFieldTransforms(op.data!);
+        const updateMask = Object.keys(op.data!).filter(
+          key => !isFieldValue(op.data![key]) || op.data![key]._type !== 'delete'
+        );
+        
+        const write: any = {
+          update: {
+            name: docPath,
+            fields: firestoreData,
+          },
+          updateMask: { fieldPaths: updateMask },
+          currentDocument: { exists: true },
+        };
+        
+        if (transforms.length > 0) {
+          write.updateTransforms = transforms;
+        }
+        
+        return write;
+      }
+      
+      case 'delete':
+        return {
+          delete: docPath,
+        };
+      
+      default:
+        throw new Error(`Unknown batch operation type: ${(op as any).type}`);
+    }
+  });
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ writes }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to perform batch write: ${errorText}`);
+  }
+  
+  return await response.json() as BatchWriteResult;
+}
