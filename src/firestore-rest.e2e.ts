@@ -17,6 +17,7 @@ import {
   deleteDocument,
   queryDocuments,
   addDocument,
+  batchWrite,
 } from './firestore-rest';
 import { FieldValue } from './field-value';
 import * as fs from 'fs';
@@ -389,6 +390,142 @@ describe('Firestore E2E Tests', () => {
       for (let i = 1; i < results.length; i++) {
         expect(results[i].data.timestamp).toBeGreaterThanOrEqual(results[i - 1].data.timestamp);
       }
+    });
+  });
+
+  describe('Batch Write Operations', () => {
+    const batchTestDocs: string[] = [];
+
+    afterAll(async () => {
+      // Cleanup batch test documents
+      for (const docId of batchTestDocs) {
+        try {
+          await deleteDocument(TEST_COLLECTION, docId);
+        } catch (error) {
+          // Ignore errors
+        }
+      }
+    });
+
+    it('should perform multiple set operations in batch', async () => {
+      const doc1Id = `test-${timestamp}-batch-set-1`;
+      const doc2Id = `test-${timestamp}-batch-set-2`;
+      const doc3Id = `test-${timestamp}-batch-set-3`;
+      batchTestDocs.push(doc1Id, doc2Id, doc3Id);
+
+      await batchWrite([
+        { type: 'set', collectionPath: TEST_COLLECTION, documentId: doc1Id, data: { name: 'Batch User 1', _test: true } },
+        { type: 'set', collectionPath: TEST_COLLECTION, documentId: doc2Id, data: { name: 'Batch User 2', _test: true } },
+        { type: 'set', collectionPath: TEST_COLLECTION, documentId: doc3Id, data: { name: 'Batch User 3', _test: true } },
+      ]);
+
+      // Verify all documents were created
+      const doc1 = await getDocument(TEST_COLLECTION, doc1Id);
+      const doc2 = await getDocument(TEST_COLLECTION, doc2Id);
+      const doc3 = await getDocument(TEST_COLLECTION, doc3Id);
+
+      expect(doc1?.name).toBe('Batch User 1');
+      expect(doc2?.name).toBe('Batch User 2');
+      expect(doc3?.name).toBe('Batch User 3');
+    });
+
+    it('should perform mixed operations (set, update, delete) in batch', async () => {
+      const setDocId = `test-${timestamp}-batch-mixed-set`;
+      const updateDocId = `test-${timestamp}-batch-mixed-update`;
+      const deleteDocId = `test-${timestamp}-batch-mixed-delete`;
+      batchTestDocs.push(setDocId, updateDocId);
+
+      // Create documents for update and delete
+      await setDocument(TEST_COLLECTION, updateDocId, { name: 'To Update', value: 10, _test: true });
+      await setDocument(TEST_COLLECTION, deleteDocId, { name: 'To Delete', _test: true });
+
+      // Perform batch operations
+      await batchWrite([
+        { type: 'set', collectionPath: TEST_COLLECTION, documentId: setDocId, data: { name: 'New Doc', _test: true } },
+        { type: 'update', collectionPath: TEST_COLLECTION, documentId: updateDocId, data: { value: 20 } },
+        { type: 'delete', collectionPath: TEST_COLLECTION, documentId: deleteDocId },
+      ]);
+
+      // Verify results
+      const setDoc = await getDocument(TEST_COLLECTION, setDocId);
+      const updateDoc = await getDocument(TEST_COLLECTION, updateDocId);
+      const deleteDoc = await getDocument(TEST_COLLECTION, deleteDocId);
+
+      expect(setDoc?.name).toBe('New Doc');
+      expect(updateDoc?.value).toBe(20);
+      expect(updateDoc?.name).toBe('To Update'); // Should still have original name
+      expect(deleteDoc).toBeNull();
+    });
+
+    it('should handle field transforms in batch operations', async () => {
+      const doc1Id = `test-${timestamp}-batch-transform-1`;
+      const doc2Id = `test-${timestamp}-batch-transform-2`;
+      batchTestDocs.push(doc1Id, doc2Id);
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: TEST_COLLECTION,
+          documentId: doc1Id,
+          data: {
+            name: 'Transform Test 1',
+            createdAt: FieldValue.serverTimestamp(),
+            count: FieldValue.increment(5),
+            _test: true,
+          },
+        },
+        {
+          type: 'set',
+          collectionPath: TEST_COLLECTION,
+          documentId: doc2Id,
+          data: {
+            name: 'Transform Test 2',
+            tags: FieldValue.arrayUnion('tag1', 'tag2'),
+            _test: true,
+          },
+        },
+      ]);
+
+      // Verify transforms were applied
+      const doc1 = await getDocument(TEST_COLLECTION, doc1Id);
+      const doc2 = await getDocument(TEST_COLLECTION, doc2Id);
+
+      expect(doc1?.name).toBe('Transform Test 1');
+      expect(doc1?.createdAt).toBeDefined();
+      expect(doc1?.count).toBe(5);
+      expect(doc2?.name).toBe('Transform Test 2');
+      expect(doc2?.tags).toEqual(['tag1', 'tag2']);
+    });
+
+    it('should handle batch operations with mergeFields option', async () => {
+      const docId = `test-${timestamp}-batch-merge`;
+      batchTestDocs.push(docId);
+
+      // Create initial document
+      await setDocument(TEST_COLLECTION, docId, {
+        name: 'Original',
+        email: 'original@example.com',
+        age: 25,
+        _test: true,
+      });
+
+      // Update with mergeFields
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: TEST_COLLECTION,
+          documentId: docId,
+          data: { name: 'Updated', city: 'NYC', age: 30 },
+          options: { mergeFields: ['name', 'city'] },
+        },
+      ]);
+
+      // Verify only specified fields were updated
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.name).toBe('Updated'); // Should be updated
+      expect(doc?.city).toBe('NYC'); // Should be added
+      expect(doc?.email).toBe('original@example.com'); // Should be preserved
+      expect(doc?.age).toBe(25); // Should NOT be updated (not in mergeFields)
     });
   });
 });

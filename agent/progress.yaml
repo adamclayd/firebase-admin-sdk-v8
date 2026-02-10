@@ -7,8 +7,8 @@ project:
   total_source_files: 16
   total_tests: 277
   total_test_suites: 10
-  total_e2e_tests: 27
-  e2e_tests_passing: 27
+  total_e2e_tests: 31
+  e2e_tests_passing: 31
   coverage_current: 98.02
   coverage_target: 80
   last_updated: 2026-02-10
