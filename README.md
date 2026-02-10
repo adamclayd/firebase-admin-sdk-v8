@@ -2,8 +2,11 @@
 
 > Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs
 
-[![npm version](https://img.shields.io/npm/v/firebase-admin-sdk-v8.svg)](https://www.npmjs.com/package/firebase-admin-sdk-v8)
+[![npm version](https://img.shields.io/npm/v/@prmichaelsen/firebase-admin-sdk-v8.svg)](https://www.npmjs.com/package/@prmichaelsen/firebase-admin-sdk-v8)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Unit Tests](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/test.yml/badge.svg)](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/test.yml)
+[![E2E Tests](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml)
+[![codecov](https://codecov.io/gh/prmichaelsen/firebase-admin-sdk-v8/branch/mainline/graph/badge.svg)](https://codecov.io/gh/prmichaelsen/firebase-admin-sdk-v8)
 
 This library provides Firebase Admin SDK functionality for Cloudflare Workers and other edge runtimes. It uses REST APIs and JWT token generation instead of the Node.js Admin SDK, making it compatible with environments that don't support Node.js.
 
@@ -25,7 +28,7 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 ## 📦 Installation
 
 ```bash
-npm install firebase-admin-sdk-v8
+npm install @prmichaelsen/firebase-admin-sdk-v8
 ```
 
 ## 🚀 Quick Start
@@ -78,7 +81,7 @@ FIREBASE_PROJECT_ID=your-project-id
 ### 2. Verify ID Tokens
 
 ```typescript
-import { verifyIdToken, getUserFromToken } from 'firebase-admin-sdk-v8';
+import { verifyIdToken, getUserFromToken } from '@prmichaelsen/firebase-admin-sdk-v8';
 
 const authHeader = request.headers.get('authorization');
 const idToken = authHeader?.split('Bearer ')[1];
@@ -94,7 +97,7 @@ try {
 ### 3. Basic Firestore Operations
 
 ```typescript
-import { setDocument, getDocument, updateDocument, FieldValue } from 'firebase-admin-sdk-v8';
+import { setDocument, getDocument, updateDocument, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
 
 // Set a document (create or overwrite)
 await setDocument('users', 'user123', {
@@ -116,7 +119,7 @@ await updateDocument('users', 'user123', {
 ### 4. Advanced Queries
 
 ```typescript
-import { queryDocuments } from 'firebase-admin-sdk-v8';
+import { queryDocuments } from '@prmichaelsen/firebase-admin-sdk-v8';
 
 const activeUsers = await queryDocuments('users', {
   where: [
@@ -397,7 +400,7 @@ export default {
 ### Leaderboard Example
 
 ```typescript
-import { queryDocuments, updateDocument, FieldValue } from 'firebase-admin-sdk-v8';
+import { queryDocuments, updateDocument, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
 
 async function getTopPlayers(limit = 10) {
   return await queryDocuments('players', {
@@ -418,7 +421,7 @@ async function updatePlayerScore(playerId: string, points: number) {
 ### Bulk Operations Example
 
 ```typescript
-import { batchWrite, FieldValue } from 'firebase-admin-sdk-v8';
+import { batchWrite, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
 
 async function bulkUpdateUsers(userIds: string[], updates: any) {
   const operations = userIds.map(userId => ({
