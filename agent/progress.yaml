@@ -4,9 +4,9 @@
 
 project:
   name: firebase-admin-sdk-v8
-  total_source_files: 8
-  total_tests: 111
-  total_test_suites: 3
+  total_source_files: 9
+  total_tests: 133
+  total_test_suites: 4
   coverage_current: 31.66
   coverage_target: 80
   last_updated: 2026-02-10
@@ -15,6 +15,11 @@ project:
     branches: 35.22
     functions: 27.71
     lines: 32.15
+  refactoring_status:
+    phase_1_converters: complete
+    phase_2_query_builder: pending
+    phase_3_transforms: pending
+    phase_4_operations: pending
 
 files:
   - name: field-value.ts
@@ -37,25 +42,45 @@ files:
     completed_date: 2026-02-10
     notes: Configuration and service account management fully tested
 
+  - name: firestore/converters.ts
+    status: complete
+    test_file: src/firestore/converters.spec.ts
+    tests_count: 22
+    coverage: 100
+    priority: high
+    estimated_hours: 2-3
+    completed_date: 2026-02-10
+    notes: |
+      Phase 1 of refactoring complete
+      - Extracted from firestore-rest.ts
+      - Data format conversion utilities
+      - All converter functions tested
+      - Backward compatible re-exports
+
   - name: firestore-rest.ts
-    status: partial
+    status: refactoring
     test_file: src/firestore-rest.spec.ts
     tests_count: 44
     coverage: 40.62
     priority: high
-    estimated_hours: 2-4
+    estimated_hours: 8-12
     started_date: 2026-02-10
     notes: |
-      Completed:
+      Being refactored into modular structure:
+      - Phase 1: Converters extracted ✅
+      - Phase 2: Query builder (pending)
+      - Phase 3: Transforms (pending)
+      - Phase 4: Operations (pending)
+      
+      Current tests cover:
       - Query structure and URL generation
-      - Data converters (toFirestoreValue, fromFirestoreValue)
-      - Field transforms (extractFieldTransforms, removeFieldTransforms)
+      - Field transforms
       - Fixed updateMask bug
       
       Still need:
+      - Extract remaining modules
       - CRUD operations with mocked fetch
-      - queryDocuments integration tests
-      - batchWrite tests
+      - Batch operation tests
 
   - name: auth.ts
     status: pending
@@ -154,14 +179,47 @@ milestones:
       - Token generation tests
       - Token caching tests
 
+refactoring_tasks:
+  - name: Phase 2 - Extract Query Builder
+    file: agent/tasks/refactor-phase-2-query-builder.md
+    status: pending
+    estimated_hours: 2-4
+    priority: high
+    
+  - name: Phase 3 - Extract Transforms
+    file: agent/tasks/refactor-phase-3-transforms.md
+    status: pending
+    estimated_hours: 2-4
+    priority: high
+    
+  - name: Phase 4 - Extract Operations
+    file: agent/tasks/refactor-phase-4-operations.md
+    status: pending
+    estimated_hours: 4-6
+    priority: medium
+
 next_steps:
-  - Expand firestore-rest.spec.ts with CRUD operation tests
-  - Mock fetch for API call tests
+  - Complete Phase 2: Extract query builder to src/firestore/query-builder.ts
+  - Complete Phase 3: Extract transforms to src/firestore/transforms.ts
+  - Complete Phase 4: Extract operations to src/firestore/operations.ts
+  - Add CRUD operation tests with mocked fetch
   - Add auth.ts tests with mocked crypto operations
   - Add token-generation.ts tests
-  - Add x509.ts tests if time permits
 
 blockers: []
+
+bugs_fixed:
+  - name: Subcollection query bug
+    version: 2.0.14
+    description: queryDocuments returned 0 results for subcollections
+    
+  - name: UpdateDocument updateMask bug
+    version: 2.0.16
+    description: Invalid property path error with multiple fields
+    
+  - name: NPM publish script bug
+    version: 2.0.16
+    description: Infinite loop with publish script
 
 notes: |
   - All tests use Jest
