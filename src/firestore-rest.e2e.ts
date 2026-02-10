@@ -393,6 +393,115 @@ describe('Firestore E2E Tests', () => {
     });
   });
 
+  describe('Deeply Nested Subcollections (4+ Levels)', () => {
+    const userId = `user-${timestamp}`;
+    const credentialId = `cred-${timestamp}`;
+    
+    // Test path similar to your error:
+    // agentbase.users/{userId}/credentials/instagram/{docId}
+    const userCollectionPath = `${TEST_COLLECTION}.users`; // Collection with dot in name
+    const credentialsPath = `${userCollectionPath}/${userId}/credentials/instagram`;
+    
+    afterAll(async () => {
+      // Cleanup
+      try {
+        await deleteDocument(credentialsPath, credentialId);
+      } catch (error) {
+        // Ignore
+      }
+      try {
+        await deleteDocument(userCollectionPath, userId);
+      } catch (error) {
+        // Ignore
+      }
+    });
+
+    it('should handle collection names with dots', async () => {
+      // Create user document in collection with dot
+      await setDocument(userCollectionPath, userId, {
+        name: 'Test User',
+        _test: true,
+      });
+
+      const doc = await getDocument(userCollectionPath, userId);
+      expect(doc).not.toBeNull();
+      expect(doc?.name).toBe('Test User');
+    }, 30000);
+
+    it('should create deeply nested subcollection (4 levels)', async () => {
+      // Create parent user first
+      await setDocument(userCollectionPath, userId, {
+        name: 'Test User',
+        _test: true,
+      });
+
+      // Create credential in 4-level deep subcollection
+      // Path: collection.with.dot/userId/credentials/instagram/credentialId
+      await setDocument(credentialsPath, credentialId, {
+        access_token: 'test_token',
+        user_id: '12345',
+        expires_in: 5184000,
+        _test: true,
+      });
+
+      // Verify it was created
+      const credential = await getDocument(credentialsPath, credentialId);
+      expect(credential).not.toBeNull();
+      expect(credential?.access_token).toBe('test_token');
+      expect(credential?.user_id).toBe('12345');
+    }, 30000);
+
+    it('should query deeply nested subcollection', async () => {
+      // Ensure parent and credential exist
+      await setDocument(userCollectionPath, userId, {
+        name: 'Test User',
+        _test: true,
+      });
+
+      await setDocument(credentialsPath, credentialId, {
+        access_token: 'test_token',
+        user_id: '12345',
+        _test: true,
+      });
+
+      // Query the deeply nested collection
+      const results = await queryDocuments(credentialsPath, {
+        where: [{ field: '_test', op: '==', value: true }],
+      });
+
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      const found = results.find(r => r.id === credentialId);
+      expect(found).toBeDefined();
+      expect(found?.data.access_token).toBe('test_token');
+    }, 30000);
+
+    it('should update deeply nested document', async () => {
+      // Ensure documents exist
+      await setDocument(userCollectionPath, userId, {
+        name: 'Test User',
+        _test: true,
+      });
+
+      await setDocument(credentialsPath, credentialId, {
+        access_token: 'test_token',
+        user_id: '12345',
+        _test: true,
+      });
+
+      // Update the credential
+      await updateDocument(credentialsPath, credentialId, {
+        access_token: 'updated_token',
+        expires_in: 7200,
+      });
+
+      // Verify update
+      const updated = await getDocument(credentialsPath, credentialId);
+      expect(updated?.access_token).toBe('updated_token');
+      expect(updated?.expires_in).toBe(7200);
+      expect(updated?.user_id).toBe('12345'); // Should still exist
+    }, 30000);
+  });
+
   describe('Batch Write Operations', () => {
     const batchTestDocs: string[] = [];
 

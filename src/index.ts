@@ -20,6 +20,17 @@ export {
   batchWrite,
 } from './firestore-rest';
 
+// Storage exports
+export {
+  uploadFile,
+  downloadFile,
+  deleteFile,
+  getFileMetadata,
+  listFiles,
+  fileExists,
+  generateSignedUrl,
+} from './storage';
+
 // Field value helpers
 export { FieldValue } from './field-value';
 
@@ -50,3 +61,13 @@ export type {
   BatchWrite,
   BatchWriteResult,
 } from './types';
+
+// Storage type exports
+export type {
+  UploadOptions,
+  DownloadOptions,
+  ListOptions,
+  FileMetadata,
+  ListFilesResult,
+  SignedUrlOptions,
+} from './storage';

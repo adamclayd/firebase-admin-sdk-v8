@@ -25,6 +25,10 @@ import {
   extractFieldTransforms,
   removeFieldTransforms,
 } from './transforms';
+import {
+  validateDocumentPath,
+  validateCollectionPath,
+} from './path-validation';
 
 const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
 
@@ -84,6 +88,9 @@ export async function setDocument(
   data: DataObject,
   options?: SetOptions
 ): Promise<void> {
+  // Validate path structure
+  validateDocumentPath('collectionPath', collectionPath, documentId);
+  
   const projectId = getProjectId();
   const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
@@ -169,6 +176,9 @@ export async function addDocument(
   data: DataObject,
   documentId?: string
 ): Promise<DocumentReference> {
+  // Validate collection path (should have odd number of segments)
+  validateCollectionPath('collectionPath', collectionPath);
+  
   const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
   
@@ -228,6 +238,9 @@ export async function getDocument(
   collectionPath: string,
   documentId: string
 ): Promise<DataObject | null> {
+  // Validate document path
+  validateDocumentPath('collectionPath', collectionPath, documentId);
+  
   const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
   
@@ -274,6 +287,9 @@ export async function updateDocument(
   documentId: string,
   data: DataObject
 ): Promise<void> {
+  // Validate document path
+  validateDocumentPath('collectionPath', collectionPath, documentId);
+  
   const projectId = getProjectId();
   const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
@@ -363,6 +379,9 @@ export async function deleteDocument(
   collectionPath: string,
   documentId: string
 ): Promise<void> {
+  // Validate document path
+  validateDocumentPath('collectionPath', collectionPath, documentId);
+  
   const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
   
@@ -405,6 +424,9 @@ export async function queryDocuments(
   collectionPath: string,
   options?: QueryOptions
 ): Promise<Array<{ id: string; data: DataObject }>> {
+  // Validate collection path (should have odd number of segments)
+  validateCollectionPath('collectionPath', collectionPath);
+  
   const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
   
