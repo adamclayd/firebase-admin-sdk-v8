@@ -12,6 +12,8 @@ tsconfig.json
 # Testing
 coverage/
 .nyc_output/
+jest.config.js
+jest.e2e.config.js
 
 # Documentation (keep README.md)
 agent/
@@ -19,6 +21,14 @@ agent/
 # Environment
 .env
 .env.*
+
+# Secrets
+service-account.json
+
+# Firebase config (for e2e testing only)
+firebase.json
+firestore.rules
+firestore.indexes.json
 
 # Logs
 *.log
