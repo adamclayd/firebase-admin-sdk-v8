@@ -154,6 +154,43 @@ describe('Firestore Operations', () => {
       expect(body.writes[0].updateTransforms[0].setToServerValue).toBe('REQUEST_TIME');
     });
 
+    it('should handle transforms with merge option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['*'] });
+      expect(body.writes[0].updateTransforms).toBeDefined();
+    });
+
+    it('should handle transforms with mergeFields option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        age: 30,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { mergeFields: ['name', 'age'] });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name', 'age'] });
+      expect(body.writes[0].updateTransforms).toBeDefined();
+    });
+
     it('should throw error on failed request', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -162,6 +199,17 @@ describe('Firestore Operations', () => {
 
       await expect(setDocument('users', 'user123', { name: 'John' }))
         .rejects.toThrow('Failed to set document');
+    });
+
+    it('should throw error on failed commit with transforms', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => 'Commit failed: permission denied',
+      });
+
+      await expect(setDocument('users', 'user123', {
+        count: FieldValue.increment(1),
+      })).rejects.toThrow('Failed to commit writes: Commit failed: permission denied');
     });
   });
 

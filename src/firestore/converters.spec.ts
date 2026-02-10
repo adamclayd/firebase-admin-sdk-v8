@@ -232,4 +232,80 @@ describe('Firestore Data Converters', () => {
       expect(restored.metadata.created).toBeInstanceOf(Date);
     });
   });
+
+  describe('FieldValue Sentinels', () => {
+    it('should handle serverTimestamp FieldValue', () => {
+      const fieldValue = {
+        _type: 'serverTimestamp',
+        _value: null,
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toEqual({ timestampValue: 'REQUEST_TIME' });
+    });
+
+    it('should handle increment FieldValue', () => {
+      const fieldValue = {
+        _type: 'increment',
+        _value: 5,
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toEqual({ integerValue: '5' });
+    });
+
+    it('should handle increment FieldValue with no value', () => {
+      const fieldValue = {
+        _type: 'increment',
+        _value: null,
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toEqual({ integerValue: '0' });
+    });
+
+    it('should handle arrayUnion FieldValue', () => {
+      const fieldValue = {
+        _type: 'arrayUnion',
+        _value: [1, 2, 3],
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toBe(fieldValue);
+    });
+
+    it('should handle arrayRemove FieldValue', () => {
+      const fieldValue = {
+        _type: 'arrayRemove',
+        _value: [1, 2],
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toBe(fieldValue);
+    });
+
+    it('should handle delete FieldValue', () => {
+      const fieldValue = {
+        _type: 'delete',
+        _value: null,
+      };
+      const result = toFirestoreValue(fieldValue);
+      expect(result).toBe(fieldValue);
+    });
+
+    it('should throw error for unknown FieldValue type', () => {
+      const fieldValue = {
+        _type: 'unknownType',
+        _value: null,
+      };
+      expect(() => toFirestoreValue(fieldValue)).toThrow('Unknown FieldValue type: unknownType');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should throw error for unsupported value types', () => {
+      const symbol = Symbol('test');
+      expect(() => toFirestoreValue(symbol)).toThrow('Unsupported value type: symbol');
+    });
+
+    it('should throw error for functions', () => {
+      const fn = () => {};
+      expect(() => toFirestoreValue(fn)).toThrow('Unsupported value type: function');
+    });
+  });
 });
