@@ -126,7 +126,12 @@ export function fromFirestoreValue(value: FirestoreValue): any {
 /**
  * Convert Firestore format to JavaScript object
  */
-export function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): DataObject {
+export function convertFromFirestoreFormat(fields: Record<string, FirestoreValue> | null | undefined): DataObject {
+  // Handle case where document has no fields (e.g., after deleteField)
+  if (!fields) {
+    return {};
+  }
+  
   const result: DataObject = {};
   
   for (const [key, value] of Object.entries(fields)) {

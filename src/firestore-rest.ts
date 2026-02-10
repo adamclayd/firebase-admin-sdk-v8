@@ -11,6 +11,7 @@ import type {
   BatchWrite,
   BatchWriteResult,
   DocumentReference,
+  FirestoreWrite,
 } from './types';
 import { getAdminAccessToken } from './token-generation';
 import { getProjectId } from './service-account';
@@ -53,6 +54,34 @@ export {
 };
 
 /**
+ * Commit writes to Firestore using the :commit API
+ * Used when field transforms are present
+ *
+ * @param writes - Array of write operations
+ * @throws {Error} If the commit fails
+ */
+async function commitWrites(writes: FirestoreWrite[]): Promise<void> {
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:commit`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ writes }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to commit writes: ${errorText}`);
+  }
+}
+
+/**
  * Set a document in Firestore (create or overwrite)
  * 
  * @param {string} collectionPath - Collection path
@@ -80,31 +109,50 @@ export async function setDocument(
   data: DataObject,
   options?: SetOptions
 ): Promise<void> {
-  const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
-  
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
   const cleanData = removeFieldTransforms(data);
   const firestoreData = convertToFirestoreFormat(cleanData);
   const transforms = extractFieldTransforms(data);
   
-  const body: any = { fields: firestoreData };
+  // If we have transforms, use the :commit API
+  if (transforms.length > 0) {
+    const updateWrite: FirestoreWrite = {
+      update: {
+        name: documentPath,
+        fields: firestoreData,
+      },
+      updateTransforms: transforms,
+    };
+    
+    // Build update mask - only include non-transform fields
+    const nonTransformFields = Object.keys(cleanData);
+    if (nonTransformFields.length > 0) {
+      if (options?.merge) {
+        updateWrite.updateMask = { fieldPaths: ['*'] };
+      } else if (options?.mergeFields && options.mergeFields.length > 0) {
+        updateWrite.updateMask = { fieldPaths: options.mergeFields };
+      } else {
+        updateWrite.updateMask = { fieldPaths: nonTransformFields };
+      }
+    }
+    
+    await commitWrites([updateWrite]);
+    return;
+  }
+  
+  // No transforms - use regular PATCH endpoint
+  const accessToken = await getAdminAccessToken();
+  const url = `${FIRESTORE_API}/${documentPath}`;
   
   let queryParams = '';
   
   if (options?.merge) {
-    // Merge all fields
     queryParams = '?updateMask.fieldPaths=*';
   } else if (options?.mergeFields && options.mergeFields.length > 0) {
-    // Merge specific fields
     const fieldPaths = options.mergeFields.join('&updateMask.fieldPaths=');
     queryParams = `?updateMask.fieldPaths=${fieldPaths}`;
-  }
-  
-  // Add field transforms if any
-  if (transforms.length > 0) {
-    body.transforms = transforms;
   }
   
   const response = await fetch(`${url}${queryParams}`, {
@@ -113,7 +161,7 @@ export async function setDocument(
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ fields: firestoreData }),
   });
   
   if (!response.ok) {
@@ -251,29 +299,62 @@ export async function updateDocument(
   documentId: string,
   data: DataObject
 ): Promise<void> {
-  const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
-  
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
   const cleanData = removeFieldTransforms(data);
   const firestoreData = convertToFirestoreFormat(cleanData);
   const transforms = extractFieldTransforms(data);
   
-  // Build update mask (exclude deleted fields)
-  const updateMaskFields = Object.keys(data)
-    .filter(key => !isFieldValue(data[key]) || data[key]._type !== 'delete');
+  // Build update mask - include all fields (regular fields and delete fields)
+  // Exclude only transform fields (serverTimestamp, increment, arrayUnion, arrayRemove)
+  const updateMaskFields = Object.keys(data).filter(key => {
+    if (!isFieldValue(data[key])) {
+      return true; // Regular field
+    }
+    // Include delete fields in mask, exclude other transforms
+    return data[key]._type === 'delete';
+  });
+  
+  // If we have transforms, use the :commit API
+  if (transforms.length > 0) {
+    const nonTransformFields = Object.keys(cleanData);
+    
+    // If we have ONLY transforms (no regular fields), use pure transform write
+    if (nonTransformFields.length === 0) {
+      const transformWrite: FirestoreWrite = {
+        transform: {
+          document: documentPath,
+          fieldTransforms: transforms,
+        },
+      };
+      await commitWrites([transformWrite]);
+      return;
+    }
+    
+    // We have both regular fields and transforms
+    const updateWrite: FirestoreWrite = {
+      update: {
+        name: documentPath,
+        fields: firestoreData,
+      },
+      updateMask: { fieldPaths: updateMaskFields },
+      updateTransforms: transforms,
+      currentDocument: { exists: true },
+    };
+    
+    await commitWrites([updateWrite]);
+    return;
+  }
+  
+  // No transforms - use regular PATCH endpoint
+  const accessToken = await getAdminAccessToken();
+  const url = `${FIRESTORE_API}/${documentPath}`;
   
   // Create query string with multiple updateMask.fieldPaths parameters
   const updateMaskParams = updateMaskFields
     .map(field => `updateMask.fieldPaths=${encodeURIComponent(field)}`)
     .join('&');
-  
-  const body: any = { fields: firestoreData };
-  
-  if (transforms.length > 0) {
-    body.transforms = transforms;
-  }
   
   const response = await fetch(`${url}?${updateMaskParams}&currentDocument.exists=true`, {
     method: 'PATCH',
@@ -281,7 +362,7 @@ export async function updateDocument(
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ fields: firestoreData }),
   });
   
   if (!response.ok) {

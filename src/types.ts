@@ -181,6 +181,44 @@ export interface QueryOptions {
 }
 
 /**
+ * Firestore field transform
+ */
+export interface FieldTransform {
+  fieldPath: string;
+  setToServerValue?: 'REQUEST_TIME';
+  increment?: FirestoreValue;
+  appendMissingElements?: { values: FirestoreValue[] };
+  removeAllFromArray?: { values: FirestoreValue[] };
+}
+
+/**
+ * Firestore document transform
+ */
+export interface DocumentTransform {
+  document: string;
+  fieldTransforms: FieldTransform[];
+}
+
+/**
+ * Firestore write operation for :commit API
+ */
+export interface FirestoreWrite {
+  update?: {
+    name: string;
+    fields: Record<string, FirestoreValue>;
+  };
+  updateMask?: {
+    fieldPaths: string[];
+  };
+  updateTransforms?: FieldTransform[];
+  currentDocument?: {
+    exists?: boolean;
+  };
+  transform?: DocumentTransform;
+  delete?: string;
+}
+
+/**
  * Batch write operation
  */
 export interface BatchWrite {

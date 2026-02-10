@@ -241,7 +241,8 @@ describe('Firestore E2E Tests', () => {
 
       const doc = await getDocument(TEST_COLLECTION, testDocId);
       expect(doc?.createdAt).toBeDefined();
-      expect(typeof doc?.createdAt).toBe('string');
+      // Firestore timestamps are returned as Date objects
+      expect(doc?.createdAt).toBeInstanceOf(Date);
     });
 
     it('should handle increment', async () => {
