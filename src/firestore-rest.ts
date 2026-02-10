@@ -5,7 +5,6 @@
 
 import type {
   DataObject,
-  FirestoreValue,
   FirestoreDocument,
   SetOptions,
   QueryOptions,
@@ -17,88 +16,22 @@ import type {
 import { getAdminAccessToken } from './token-generation';
 import { getProjectId } from './service-account';
 import { isFieldValue } from './field-value';
+import {
+  toFirestoreValue,
+  fromFirestoreValue,
+  convertToFirestoreFormat,
+  convertFromFirestoreFormat,
+} from './firestore/converters';
 
 const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
 
-/**
- * Convert JavaScript value to Firestore format
- * @internal - Exported for testing
- */
-export function toFirestoreValue(value: any): FirestoreValue {
-  if (value === null || value === undefined) {
-    return { nullValue: null };
-  }
-
-  // Handle FieldValue sentinels
-  if (isFieldValue(value)) {
-    switch (value._type) {
-      case 'serverTimestamp':
-        return { timestampValue: 'REQUEST_TIME' } as any;
-      case 'increment':
-        return {
-          integerValue: String(value._value || 0),
-        } as any; // Will be handled with transforms
-      case 'arrayUnion':
-      case 'arrayRemove':
-      case 'delete':
-        // These need special handling in the request
-        return value as any;
-      default:
-        throw new Error(`Unknown FieldValue type: ${value._type}`);
-    }
-  }
-  
-  if (typeof value === 'string') {
-    return { stringValue: value };
-  }
-  
-  if (typeof value === 'boolean') {
-    return { booleanValue: value };
-  }
-  
-  if (typeof value === 'number') {
-    if (Number.isInteger(value)) {
-      return { integerValue: String(value) };
-    }
-    return { doubleValue: value };
-  }
-  
-  if (value instanceof Date) {
-    return { timestampValue: value.toISOString() };
-  }
-  
-  if (Array.isArray(value)) {
-    return {
-      arrayValue: {
-        values: value.map(v => toFirestoreValue(v))
-      }
-    };
-  }
-  
-  if (typeof value === 'object') {
-    return {
-      mapValue: {
-        fields: convertToFirestoreFormat(value)
-      }
-    };
-  }
-  
-  throw new Error(`Unsupported value type: ${typeof value}`);
-}
-
-/**
- * Convert JavaScript object to Firestore format
- * @internal - Exported for testing
- */
-export function convertToFirestoreFormat(data: DataObject): Record<string, FirestoreValue> {
-  const result: Record<string, FirestoreValue> = {};
-  
-  for (const [key, value] of Object.entries(data)) {
-    result[key] = toFirestoreValue(value);
-  }
-  
-  return result;
-}
+// Re-export converter functions for backward compatibility and testing
+export {
+  toFirestoreValue,
+  fromFirestoreValue,
+  convertToFirestoreFormat,
+  convertFromFirestoreFormat,
+};
 
 /**
  * Extract field transforms from data (for increment, arrayUnion, etc.)
@@ -169,59 +102,6 @@ export function removeFieldTransforms(data: DataObject): DataObject {
   return result;
 }
 
-/**
- * Convert Firestore value to JavaScript value
- * @internal - Exported for testing
- */
-export function fromFirestoreValue(value: FirestoreValue): any {
-  if ('stringValue' in value) {
-    return value.stringValue;
-  }
-  
-  if ('integerValue' in value) {
-    return parseInt(value.integerValue, 10);
-  }
-  
-  if ('doubleValue' in value) {
-    return value.doubleValue;
-  }
-  
-  if ('booleanValue' in value) {
-    return value.booleanValue;
-  }
-  
-  if ('nullValue' in value) {
-    return null;
-  }
-  
-  if ('timestampValue' in value) {
-    return new Date(value.timestampValue);
-  }
-  
-  if ('arrayValue' in value) {
-    return (value.arrayValue.values || []).map(v => fromFirestoreValue(v));
-  }
-  
-  if ('mapValue' in value) {
-    return convertFromFirestoreFormat(value.mapValue.fields || {});
-  }
-  
-  return null;
-}
-
-/**
- * Convert Firestore format to JavaScript object
- * @internal - Exported for testing
- */
-export function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): DataObject {
-  const result: DataObject = {};
-  
-  for (const [key, value] of Object.entries(fields)) {
-    result[key] = fromFirestoreValue(value);
-  }
-  
-  return result;
-}
 
 /**
  * Build query body for structured queries
