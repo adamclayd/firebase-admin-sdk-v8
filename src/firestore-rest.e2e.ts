@@ -19,6 +19,8 @@ import {
   addDocument,
 } from './firestore-rest';
 import { FieldValue } from './field-value';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('Firestore E2E Tests', () => {
   const TEST_COLLECTION = 'e2e-tests';
@@ -26,12 +28,20 @@ describe('Firestore E2E Tests', () => {
   let testDocId: string;
 
   beforeAll(() => {
+    // Load service account from filesystem
+    const serviceAccountPath = path.join(__dirname, '../service-account.json');
+    
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(
+        'service-account.json not found. Please add your Firebase service account credentials to the project root.'
+      );
+    }
+    
+    const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf-8');
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    
     // Initialize with service account
-    // The service account will be loaded from GOOGLE_APPLICATION_CREDENTIALS env var
-    // or from the serviceAccount config option
-    initializeApp({
-      serviceAccount: require('../../service-account.json'),
-    });
+    initializeApp({ serviceAccount });
   });
 
   afterEach(async () => {
