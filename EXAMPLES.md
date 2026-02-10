@@ -50,16 +50,18 @@ await setDocument('users', 'user123', {
 import { addDocument } from 'firebase-admin-sdk-v8';
 
 // Auto-generate document ID
-const docId = await addDocument('posts', {
+const docRef = await addDocument('posts', {
   title: 'Hello World',
   content: 'This is my first post',
   createdAt: new Date(),
 });
+console.log('Created document:', docRef.id);
 
 // Or specify custom ID
-const customId = await addDocument('posts', {
+const customDocRef = await addDocument('posts', {
   title: 'Custom ID Post',
 }, 'my-custom-id');
+console.log('Created document:', customDocRef.id); // 'my-custom-id'
 ```
 
 ### Get Document
@@ -426,7 +428,7 @@ await setDocument('users', 'user123', {
 import { addDocument, FieldValue } from 'firebase-admin-sdk-v8';
 
 async function registerUser(email: string, name: string) {
-  const userId = await addDocument('users', {
+  const docRef = await addDocument('users', {
     email,
     name,
     createdAt: FieldValue.serverTimestamp(),
@@ -435,7 +437,7 @@ async function registerUser(email: string, name: string) {
     roles: ['user'],
   });
   
-  return userId;
+  return docRef.id;
 }
 ```
 
@@ -458,7 +460,7 @@ async function trackUserLogin(userId: string) {
 import { addDocument, updateDocument, FieldValue } from 'firebase-admin-sdk-v8';
 
 async function createPost(title: string, content: string, tags: string[]) {
-  const postId = await addDocument('posts', {
+  const docRef = await addDocument('posts', {
     title,
     content,
     tags,
@@ -468,7 +470,7 @@ async function createPost(title: string, content: string, tags: string[]) {
     updatedAt: FieldValue.serverTimestamp(),
   });
   
-  return postId;
+  return docRef.id;
 }
 
 async function addTagToPost(postId: string, tag: string) {

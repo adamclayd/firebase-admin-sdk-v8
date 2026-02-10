@@ -88,6 +88,16 @@ export interface FirestoreDocument {
 export type DataObject = Record<string, any>;
 
 /**
+ * Document reference (simplified version for REST API)
+ */
+export interface DocumentReference {
+  /** Document ID */
+  id: string;
+  /** Collection path */
+  path: string;
+}
+
+/**
  * Set options for document writes
  */
 export interface SetOptions {

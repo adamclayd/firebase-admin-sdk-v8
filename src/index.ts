@@ -38,6 +38,7 @@ export type {
   FirestoreValue,
   FirestoreDocument,
   DataObject,
+  DocumentReference,
   SetOptions,
   UpdateOptions,
   FieldValue as FieldValueSentinel,

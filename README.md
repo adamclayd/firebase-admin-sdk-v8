@@ -169,13 +169,16 @@ await setDocument('users', 'user123', { age: 31, city: 'NYC' }, {
 });
 ```
 
-#### `addDocument(collectionPath, data, documentId?): Promise<string>`
+#### `addDocument(collectionPath, data, documentId?): Promise<DocumentReference>`
 
-Add a document with auto-generated or custom ID.
+Add a document with auto-generated or custom ID. Returns a DocumentReference with `id` and `path` properties.
 
 ```typescript
-const id = await addDocument('posts', { title: 'Hello' });
-const customId = await addDocument('posts', { title: 'Hi' }, 'custom-id');
+const docRef = await addDocument('posts', { title: 'Hello' });
+console.log('Created:', docRef.id); // Auto-generated ID
+
+const customDocRef = await addDocument('posts', { title: 'Hi' }, 'custom-id');
+console.log('Created:', customDocRef.id); // 'custom-id'
 ```
 
 #### `getDocument(collectionPath, documentId): Promise<DataObject | null>`

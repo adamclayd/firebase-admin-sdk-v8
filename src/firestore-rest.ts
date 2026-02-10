@@ -12,6 +12,7 @@ import type {
   QueryFilter,
   BatchWrite,
   BatchWriteResult,
+  DocumentReference,
 } from './types';
 import { getAdminAccessToken } from './token-generation';
 import { getProjectId } from './service-account';
@@ -382,27 +383,28 @@ export async function setDocument(
 
 /**
  * Add a document to Firestore collection
- * 
+ *
  * @param {string} collectionPath - Collection path (e.g., 'users' or 'users/uid/posts')
  * @param {DataObject} data - Document data
  * @param {string} [documentId] - Optional document ID (auto-generated if not provided)
- * @returns {Promise<string>} Created document ID
+ * @returns {Promise<DocumentReference>} Document reference with id and path
  * @throws {Error} If the operation fails
- * 
+ *
  * @example
  * ```typescript
- * const docId = await addDocument('users', {
+ * const docRef = await addDocument('users', {
  *   name: 'John Doe',
  *   email: 'john@example.com',
  *   createdAt: new Date()
  * });
+ * console.log('Created document:', docRef.id);
  * ```
  */
 export async function addDocument(
   collectionPath: string,
   data: DataObject,
   documentId?: string
-): Promise<string> {
+): Promise<DocumentReference> {
   const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
   
@@ -434,7 +436,12 @@ export async function addDocument(
   }
   
   const result = await response.json() as FirestoreDocument;
-  return result.name.split('/').pop()!;
+  const docId = result.name.split('/').pop()!;
+  
+  return {
+    id: docId,
+    path: `${collectionPath}/${docId}`,
+  };
 }
 
 /**
