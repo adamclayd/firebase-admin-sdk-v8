@@ -31,10 +31,19 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > service-account.json
       
-      - name: Run e2e tests
-        run: npm run test:e2e
+      - name: Run e2e tests with coverage
+        run: npm run test:e2e -- --coverage
         env:
           NODE_ENV: test
+      
+      - name: Upload e2e coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: e2etests
+          name: codecov-e2e
+          fail_ci_if_error: false
       
       - name: Clean up service account file
         if: always()
