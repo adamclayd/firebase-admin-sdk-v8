@@ -4,19 +4,27 @@
 
 project:
   name: firebase-admin-sdk-v8
-  total_source_files: 13
-  total_tests: 154
-  total_test_suites: 6
+  total_source_files: 15
+  total_tests: 194
+  total_test_suites: 7
   total_e2e_tests: 15
   e2e_tests_passing: 15
-  coverage_current: 31.66
+  coverage_current: 47.66
   coverage_target: 80
   last_updated: 2026-02-10
   coverage_by_metric:
-    statements: 31.66
-    branches: 35.22
-    functions: 27.71
-    lines: 32.15
+    statements: 47.66
+    branches: 57.62
+    functions: 34.96
+    lines: 48.43
+  coverage_by_module:
+    firestore: 88.38
+    config: 100
+    field_value: 100
+    service_account: 100
+    auth: 0
+    token_generation: 14.28
+    x509: 0
   refactoring_status:
     phase_1_converters: complete
     phase_2_query_builder: complete
