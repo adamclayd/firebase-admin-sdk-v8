@@ -537,9 +537,13 @@ export async function updateDocument(
   const transforms = extractFieldTransforms(data);
   
   // Build update mask (exclude deleted fields)
-  const updateMask = Object.keys(data)
-    .filter(key => !isFieldValue(data[key]) || data[key]._type !== 'delete')
-    .join(',');
+  const updateMaskFields = Object.keys(data)
+    .filter(key => !isFieldValue(data[key]) || data[key]._type !== 'delete');
+  
+  // Create query string with multiple updateMask.fieldPaths parameters
+  const updateMaskParams = updateMaskFields
+    .map(field => `updateMask.fieldPaths=${encodeURIComponent(field)}`)
+    .join('&');
   
   const body: any = { fields: firestoreData };
   
@@ -547,7 +551,7 @@ export async function updateDocument(
     body.transforms = transforms;
   }
   
-  const response = await fetch(`${url}?updateMask.fieldPaths=${updateMask}&currentDocument.exists=true`, {
+  const response = await fetch(`${url}?${updateMaskParams}&currentDocument.exists=true`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
