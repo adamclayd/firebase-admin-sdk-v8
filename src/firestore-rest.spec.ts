@@ -139,23 +139,7 @@ describe('Firestore Query Structure', () => {
     });
   });
 
-  describe('CRUD Operations (mocked)', () => {
-    // Mock fetch globally
-    const originalFetch = global.fetch;
-    let mockFetch: jest.Mock;
-
-    beforeEach(() => {
-      mockFetch = jest.fn();
-      global.fetch = mockFetch as any;
-    });
-
-    afterEach(() => {
-      global.fetch = originalFetch;
-      jest.clearAllMocks();
-    });
-
-    // Note: These tests require mocking getAdminAccessToken and getProjectId
-    // For now, we'll skip them and focus on what we can test
-    // Full CRUD tests should be added when we can properly mock the dependencies
-  });
+  // CRUD Operations tests to be added
+  // Requires mocking getAdminAccessToken and getProjectId
+  // See agent/tasks/test-firestore-rest.md for details
 });

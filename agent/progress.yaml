@@ -7,9 +7,14 @@ project:
   total_source_files: 8
   total_tests: 76
   total_test_suites: 3
-  coverage_current: 30
+  coverage_current: 17.1
   coverage_target: 80
   last_updated: 2026-02-10
+  coverage_by_metric:
+    statements: 17.1
+    branches: 15.78
+    functions: 15.85
+    lines: 17.19
 
 files:
   - name: field-value.ts
