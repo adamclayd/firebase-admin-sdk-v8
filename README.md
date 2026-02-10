@@ -521,10 +521,131 @@ For better query performance:
 | Firestore Queries | ✅ | where, orderBy, limit, cursors |
 | Firestore Batch | ✅ | Up to 500 operations |
 | Firestore Transactions | ❌ | Not yet implemented |
+| **Realtime Listeners** | **❌** | **See explanation below** |
 | Field Values | ✅ | increment, arrayUnion, serverTimestamp, etc. |
 | Realtime Database | ❌ | Not planned |
 | Cloud Storage | ❌ | Not yet implemented |
 | Cloud Messaging | ❌ | Not yet implemented |
+
+## ⚠️ Realtime Listeners Not Supported
+
+This library **does not support** Firestore realtime listeners (`onSnapshot()`). Here's why:
+
+### Technical Limitation
+
+**This library uses the Firestore REST API**, which is:
+- ✅ Stateless (request/response only)
+- ✅ Compatible with edge runtimes (Cloudflare Workers, Vercel Edge)
+- ❌ **No persistent connections**
+- ❌ **No server-push capabilities**
+- ❌ **No streaming support**
+
+**Realtime listeners require**:
+- Persistent connections (WebSocket or gRPC)
+- Bidirectional streaming
+- Server-push architecture
+
+The Firestore REST API simply doesn't provide these capabilities.
+
+### Why Not Implement gRPC?
+
+While Firestore does offer a gRPC API with streaming support, implementing it would require:
+
+1. **Complex Protocol Implementation**
+   - HTTP/2 framing
+   - gRPC message framing
+   - Protobuf encoding/decoding
+   - Authentication flow
+   - Reconnection logic
+   - ~100+ hours of development
+
+2. **Runtime Limitations**
+   - Cloudflare Workers doesn't support full gRPC (only gRPC-Web)
+   - gRPC-Web requires a proxy server
+   - Can't connect directly to Firestore's gRPC endpoint
+   - Would only work in Durable Objects, not regular Workers
+
+3. **Maintenance Burden**
+   - Must keep up with Firestore protocol changes
+   - Complex debugging and error handling
+   - High ongoing maintenance cost
+
+### Alternatives
+
+If you need realtime updates, consider these approaches:
+
+#### 1. **Polling (Simple)**
+```typescript
+// Poll for changes every 5 seconds
+setInterval(async () => {
+  const doc = await getDocument('users', 'user123');
+  // Handle updates
+}, 5000);
+```
+
+**Pros**: Simple, works everywhere
+**Cons**: 5-second delay, polling costs
+
+#### 2. **Durable Objects + Polling (Better)**
+```typescript
+// Durable Object polls once, broadcasts to many clients
+export class FirestoreSync {
+  async poll() {
+    const doc = await getDocument('users', 'user123');
+    // Broadcast to all connected WebSocket clients
+    for (const ws of this.sessions) {
+      ws.send(JSON.stringify(doc));
+    }
+  }
+}
+```
+
+**Pros**: One poll serves many clients, WebSocket push to clients
+**Cons**: Still polling-based, Cloudflare-specific
+
+#### 3. **Hybrid Architecture (Best)**
+```typescript
+// Use firebase-admin-node for realtime in Node.js
+import admin from 'firebase-admin';
+
+admin.firestore().collection('users').doc('user123')
+  .onSnapshot((snapshot) => {
+    // True realtime updates
+    console.log('Update:', snapshot.data());
+  });
+
+// Use this library for CRUD in edge functions
+import { getDocument } from '@prmichaelsen/firebase-admin-sdk-v8';
+const doc = await getDocument('users', 'user123');
+```
+
+**Pros**: True realtime where needed, edge performance for CRUD
+**Cons**: Requires separate Node.js service
+
+#### 4. **Firebase Client SDK (Frontend)**
+```typescript
+// Use Firebase Client SDK in browser/mobile
+import { onSnapshot, doc } from 'firebase/firestore';
+
+onSnapshot(doc(db, 'users', 'user123'), (snapshot) => {
+  console.log('Update:', snapshot.data());
+});
+```
+
+**Pros**: True realtime, built-in, well-supported
+**Cons**: Client-side only, requires Firebase Auth
+
+### Recommendation
+
+- **For edge runtimes**: Use polling or Durable Objects pattern
+- **For true realtime**: Use `firebase-admin-node` in Node.js
+- **For client apps**: Use Firebase Client SDK
+- **For hybrid**: Use this library for CRUD + Node.js for realtime
+
+### Related
+
+- [firebase-admin-node](https://github.com/firebase/firebase-admin-node) - Full Admin SDK with realtime support
+- [Firebase Client SDK](https://firebase.google.com/docs/firestore/query-data/listen) - Client-side realtime listeners
 
 ## 🗺️ Roadmap
 
