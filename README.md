@@ -30,28 +30,50 @@ npm install firebase-admin-sdk-v8
 
 ## 🚀 Quick Start
 
-### 1. Set Environment Variables
+### 1. Initialize the SDK
 
-```env
-# Firebase Admin Service Account (JSON string) - REQUIRED
-FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}'
+**Option A: Cloudflare Workers / Edge Runtimes (Recommended)**
 
-# Firebase Project ID - REQUIRED (use either variable name)
-FIREBASE_PROJECT_ID=your-project-id
-# OR
-PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+```typescript
+import { initializeApp, verifyIdToken } from '@prmichaelsen/firebase-admin-sdk-v8';
 
-# Optional: Standard Firebase client config (for reference)
-FIREBASE_API_KEY=your-api-key
-FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-FIREBASE_APP_ID=your-app-id
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    // Initialize with env variables
+    initializeApp({
+      serviceAccount: env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY,
+      projectId: env.FIREBASE_PROJECT_ID
+    });
+
+    // Now use the SDK
+    const token = request.headers.get('authorization')?.split('Bearer ')[1];
+    const user = await verifyIdToken(token);
+    
+    return new Response(JSON.stringify({ user }));
+  }
+};
 ```
 
-**Required Environment Variables:**
-- `FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY` - Your Firebase service account JSON (as a string)
-- `FIREBASE_PROJECT_ID` or `PUBLIC_FIREBASE_PROJECT_ID` - Your Firebase project ID
+**Option B: Node.js / Traditional Environments**
+
+```typescript
+import { initializeApp } from '@prmichaelsen/firebase-admin-sdk-v8';
+
+// Option 1: Explicit initialization
+initializeApp({
+  serviceAccount: JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY!),
+  projectId: process.env.FIREBASE_PROJECT_ID
+});
+
+// Option 2: Auto-detect from process.env (no initialization needed)
+// The SDK will automatically use process.env if initializeApp() is not called
+```
+
+**Environment Variables (if not using initializeApp):**
+```env
+FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+FIREBASE_PROJECT_ID=your-project-id
+```
 
 ### 2. Verify ID Tokens
 

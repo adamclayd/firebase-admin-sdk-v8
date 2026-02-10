@@ -3,6 +3,9 @@
  * Cloudflare Workers compatible Firebase Admin SDK using REST APIs
  */
 
+// Configuration exports
+export { initializeApp, getConfig, clearConfig } from './config';
+
 // Auth exports
 export { verifyIdToken, getUserFromToken, getAuth } from './auth';
 
@@ -23,7 +26,7 @@ export { FieldValue } from './field-value';
 // Token generation exports
 export { getAdminAccessToken, clearTokenCache } from './token-generation';
 
-// Service account exports
+// Service account exports (deprecated, use initializeApp instead)
 export { getServiceAccount, getProjectId } from './service-account';
 
 // Type exports
