@@ -526,6 +526,28 @@ describe('Firestore Operations', () => {
       expect(result.path).toBe('users/uid123/posts/post-id');
     });
 
+    it('should handle field transforms', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/auto-id-123',
+          fields: {},
+        }),
+      });
+
+      await addDocument('users', {
+        name: 'John',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.transforms).toBeDefined();
+      expect(body.transforms[0].fieldPath).toBe('createdAt');
+      expect(body.transforms[0].setToServerValue).toBe('REQUEST_TIME');
+    });
+
     it('should throw error on failed request', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -781,6 +803,81 @@ describe('Firestore Operations', () => {
 
       expect(body.writes[0].updateTransforms).toBeDefined();
       expect(body.writes[0].updateTransforms[0].setToServerValue).toBe('REQUEST_TIME');
+    });
+
+    it('should handle set with merge option in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: { name: 'John' },
+          options: { merge: true },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['*'] });
+    });
+
+    it('should handle set with mergeFields option in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: { name: 'John', age: 30 },
+          options: { mergeFields: ['name'] },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
+    });
+
+    it('should handle update with transforms in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'update',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: {
+            name: 'John',
+            count: FieldValue.increment(1),
+          },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+
+      expect(body.writes[0].updateTransforms).toBeDefined();
+      expect(body.writes[0].updateTransforms[0].increment.integerValue).toBe('1');
+    });
+
+    it('should throw error for unknown operation type', async () => {
+      await expect(batchWrite([
+        { type: 'unknown' as any, collectionPath: 'users', documentId: 'user1' },
+      ])).rejects.toThrow('Unknown batch operation type: unknown');
     });
 
     it('should throw error on failed request', async () => {

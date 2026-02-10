@@ -5,20 +5,20 @@
 project:
   name: firebase-admin-sdk-v8
   total_source_files: 16
-  total_tests: 272
+  total_tests: 277
   total_test_suites: 10
   total_e2e_tests: 27
   e2e_tests_passing: 27
-  coverage_current: 97.04
+  coverage_current: 98.02
   coverage_target: 80
   last_updated: 2026-02-10
   coverage_by_metric:
-    statements: 97.04
-    branches: 90.73
+    statements: 98.02
+    branches: 93.05
     functions: 100
-    lines: 96.98
+    lines: 97.99
   coverage_by_module:
-    firestore: 97.59
+    firestore: 99.31
     config: 100
     field_value: 100
     service_account: 100
@@ -301,11 +301,11 @@ refactoring_tasks:
       - Verified with e2e tests (15/15 passing)
 
 next_steps:
-  - Publish v2.0.21 or v2.1.0 (major milestone: 97.04% coverage, 90.73% branches!)
+  - Publish v2.0.21 or v2.1.0 (major milestone: 98.02% coverage, 93.05% branches!)
   - Add Storage implementation (see agent/tasks/storage-implementation.md)
   - Consider adding integration tests for real Firebase services
   - Document API changes and migration guide
-  - Celebrate reaching 97% coverage (exceeded 80% goal by 17%!)
+  - Celebrate reaching 98% coverage (exceeded 80% goal by 18%!)
 
 blockers: []
 
@@ -422,6 +422,32 @@ achievements:
       
       Total tests: 260 → 272 (+12)
       Now at 97.04% overall coverage (exceeded 80% goal by 17.04%)!
+      
+  - name: 98% Coverage Achievement
+    date: 2026-02-10
+    description: |
+      Pushed coverage to 98% by adding edge case tests
+      
+      Added 5 new tests:
+      - 1 test for addDocument with field transforms
+      - 3 tests for batchWrite with merge options (merge, mergeFields)
+      - 1 test for batchWrite update with transforms
+      - 1 test for batchWrite unknown operation type error
+      
+      Coverage improvements:
+      - Overall: 97.04% → 98.02% (+0.98%)
+      - Statements: 97.04% → 98.02% (+0.98%)
+      - Branches: 90.73% → 93.05% (+2.32%)
+      - Functions: 100% (maintained)
+      - Lines: 96.98% → 97.99% (+1.01%)
+      
+      Module improvements:
+      - operations.ts: 95.85% → 98.81% statements (+2.96%)
+      - operations.ts: 88.23% → 97.05% branches (+8.82%)
+      - firestore module: 97.59% → 99.31% (+1.72%)
+      
+      Total tests: 272 → 277 (+5)
+      Now at 98.02% overall coverage (exceeded 80% goal by 18.02%)!
 
 notes: |
   - All tests use Jest
