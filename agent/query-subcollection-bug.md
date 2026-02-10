@@ -4,6 +4,28 @@
 
 `queryDocuments` returns 0 results for subcollections even though documents exist.
 
+## Root Cause Found
+
+**Line 768 in index.mjs:**
+```javascript
+const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:runQuery`;
+```
+
+This uses the GLOBAL `:runQuery` endpoint, which doesn't work for subcollections.
+
+**Should be:**
+```javascript
+// For subcollections, use parent document's :runQuery
+const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${parentPath}:runQuery`;
+```
+
+**Example:**
+- Collection path: `e0.agentbase.conversations/main/messages`
+- Parent path: `e0.agentbase.conversations/main`
+- Subcollection: `messages`
+- Correct URL: `.../documents/e0.agentbase.conversations/main:runQuery`
+- Current URL: `.../documents:runQuery` ❌
+
 ## Evidence
 
 **Direct GET (works):**
