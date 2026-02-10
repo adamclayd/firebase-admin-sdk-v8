@@ -648,6 +648,14 @@ export async function queryDocuments(
   
   const structuredQuery = buildStructuredQuery(collectionPath, options);
   
+  // Debug logging
+  console.log('[queryDocuments] Debug:', {
+    collectionPath,
+    pathSegments,
+    queryUrl,
+    structuredQuery: JSON.stringify(structuredQuery, null, 2)
+  });
+  
   const response = await fetch(queryUrl, {
     method: 'POST',
     headers: {
@@ -659,10 +667,16 @@ export async function queryDocuments(
   
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[queryDocuments] Error response:', errorText);
     throw new Error(`Failed to query documents: ${errorText}`);
   }
   
   const results = await response.json();
+  console.log('[queryDocuments] Results:', {
+    resultCount: results.length,
+    hasDocuments: results.filter((r: any) => r.document).length,
+    firstResult: results[0]
+  });
   
   return results
     .filter((result: any) => result.document)
