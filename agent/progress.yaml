@@ -1,0 +1,163 @@
+---
+# Testing Progress Tracker
+# Track test coverage and completion status for firebase-admin-sdk-v8
+
+project:
+  name: firebase-admin-sdk-v8
+  total_source_files: 8
+  total_tests: 76
+  total_test_suites: 3
+  coverage_current: 30
+  coverage_target: 80
+  last_updated: 2026-02-10
+
+files:
+  - name: field-value.ts
+    status: complete
+    test_file: src/field-value.spec.ts
+    tests_count: 42
+    coverage: 100
+    priority: medium
+    estimated_hours: 1-2
+    completed_date: 2026-02-10
+    notes: All FieldValue sentinel functions tested
+
+  - name: config.ts
+    status: complete
+    test_file: src/config.spec.ts
+    tests_count: 25
+    coverage: 95
+    priority: high
+    estimated_hours: 2-3
+    completed_date: 2026-02-10
+    notes: Configuration and service account management fully tested
+
+  - name: firestore-rest.ts
+    status: partial
+    test_file: src/firestore-rest.spec.ts
+    tests_count: 9
+    coverage: 15
+    priority: high
+    estimated_hours: 4-6
+    started_date: 2026-02-10
+    notes: |
+      Query structure complete. Still need:
+      - CRUD operations (setDocument, getDocument, updateDocument, deleteDocument, addDocument)
+      - queryDocuments integration tests
+      - batchWrite tests
+      - Data converter tests
+      - Field transform tests
+
+  - name: auth.ts
+    status: pending
+    test_file: src/auth.spec.ts
+    tests_count: 0
+    coverage: 0
+    priority: high
+    estimated_hours: 2-3
+    notes: |
+      Need to test:
+      - verifyIdToken
+      - setCustomUserClaims
+      - JWT verification helpers
+      - Public key caching
+
+  - name: token-generation.ts
+    status: pending
+    test_file: src/token-generation.spec.ts
+    tests_count: 0
+    coverage: 0
+    priority: high
+    estimated_hours: 2-3
+    notes: |
+      Need to test:
+      - getAdminAccessToken
+      - JWT generation
+      - Token caching
+      - RSA signing
+
+  - name: x509.ts
+    status: pending
+    test_file: src/x509.spec.ts
+    tests_count: 0
+    coverage: 0
+    priority: medium
+    estimated_hours: 2-3
+    notes: |
+      Need to test:
+      - Certificate parsing
+      - Certificate validation
+      - Public key extraction
+
+  - name: types.ts
+    status: skipped
+    test_file: null
+    tests_count: 0
+    coverage: 0
+    priority: low
+    notes: Type definitions only, no logic to test
+
+  - name: index.ts
+    status: skipped
+    test_file: null
+    tests_count: 0
+    coverage: 0
+    priority: low
+    notes: Export file only, no logic to test
+
+milestones:
+  - name: Basic infrastructure
+    status: complete
+    date: 2026-02-10
+    items:
+      - Jest configuration
+      - TypeScript support
+      - Test scripts in package.json
+      - Colocated test pattern
+
+  - name: Core utilities
+    status: complete
+    date: 2026-02-10
+    items:
+      - field-value.ts tests
+      - config.ts tests
+
+  - name: Firestore operations
+    status: in_progress
+    target_date: 2026-02-11
+    items:
+      - Query structure tests (complete)
+      - CRUD operation tests (pending)
+      - Batch operation tests (pending)
+
+  - name: Authentication
+    status: pending
+    target_date: 2026-02-12
+    items:
+      - Token verification tests
+      - Custom claims tests
+      - X.509 certificate tests
+
+  - name: Token management
+    status: pending
+    target_date: 2026-02-12
+    items:
+      - Token generation tests
+      - Token caching tests
+
+next_steps:
+  - Expand firestore-rest.spec.ts with CRUD operation tests
+  - Mock fetch for API call tests
+  - Add auth.ts tests with mocked crypto operations
+  - Add token-generation.ts tests
+  - Add x509.ts tests if time permits
+
+blockers: []
+
+notes: |
+  - All tests use Jest
+  - Tests are colocated with source files (*.spec.ts)
+  - Mocking strategy: Mock external dependencies (fetch, crypto, etc.)
+  - No external API calls in tests
+  - Fast execution (<2 seconds for all tests)
+  - Focus on public API functions
