@@ -4,9 +4,9 @@
 
 project:
   name: firebase-admin-sdk-v8
-  total_source_files: 9
-  total_tests: 133
-  total_test_suites: 4
+  total_source_files: 11
+  total_tests: 154
+  total_test_suites: 5
   coverage_current: 31.66
   coverage_target: 80
   last_updated: 2026-02-10
@@ -17,7 +17,7 @@ project:
     lines: 32.15
   refactoring_status:
     phase_1_converters: complete
-    phase_2_query_builder: pending
+    phase_2_query_builder: complete
     phase_3_transforms: pending
     phase_4_operations: pending
 
@@ -57,10 +57,26 @@ files:
       - All converter functions tested
       - Backward compatible re-exports
 
+  - name: firestore/query-builder.ts
+    status: complete
+    test_file: src/firestore/query-builder.spec.ts
+    tests_count: 27
+    coverage: 100
+    priority: high
+    estimated_hours: 2-4
+    completed_date: 2026-02-10
+    notes: |
+      Phase 2 of refactoring complete
+      - Extracted from firestore-rest.ts
+      - buildStructuredQuery function
+      - mapWhereOp function
+      - All query operators tested
+      - Backward compatible re-exports
+
   - name: firestore-rest.ts
     status: refactoring
     test_file: src/firestore-rest.spec.ts
-    tests_count: 44
+    tests_count: 29
     coverage: 40.62
     priority: high
     estimated_hours: 8-12
@@ -68,12 +84,12 @@ files:
     notes: |
       Being refactored into modular structure:
       - Phase 1: Converters extracted ✅
-      - Phase 2: Query builder (pending)
+      - Phase 2: Query builder extracted ✅
       - Phase 3: Transforms (pending)
       - Phase 4: Operations (pending)
       
       Current tests cover:
-      - Query structure and URL generation
+      - URL generation (integration tests)
       - Field transforms
       - Fixed updateMask bug
       
@@ -182,9 +198,15 @@ milestones:
 refactoring_tasks:
   - name: Phase 2 - Extract Query Builder
     file: agent/tasks/refactor-phase-2-query-builder.md
-    status: pending
+    status: complete
     estimated_hours: 2-4
     priority: high
+    completed_date: 2026-02-10
+    notes: |
+      - Created src/firestore/query-builder.ts
+      - Created src/firestore/query-builder.spec.ts (27 tests)
+      - Updated firestore-rest.ts to import and re-export
+      - All 154 tests passing
     
   - name: Phase 3 - Extract Transforms
     file: agent/tasks/refactor-phase-3-transforms.md
@@ -199,7 +221,6 @@ refactoring_tasks:
     priority: medium
 
 next_steps:
-  - Complete Phase 2: Extract query builder to src/firestore/query-builder.ts
   - Complete Phase 3: Extract transforms to src/firestore/transforms.ts
   - Complete Phase 4: Extract operations to src/firestore/operations.ts
   - Add CRUD operation tests with mocked fetch

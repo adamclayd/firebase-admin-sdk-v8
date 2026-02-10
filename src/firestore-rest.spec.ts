@@ -1,9 +1,8 @@
 /**
- * Unit test to verify structured query generation for subcollections
+ * Integration tests for Firestore REST API operations
  */
 
 import {
-  buildStructuredQuery,
   toFirestoreValue,
   fromFirestoreValue,
   convertToFirestoreFormat,
@@ -12,97 +11,8 @@ import {
   removeFieldTransforms,
 } from './firestore-rest';
 import { FieldValue } from './field-value';
-import type { QueryOptions } from './types';
 
-describe('Firestore Query Structure', () => {
-  describe('buildStructuredQuery', () => {
-    it('should generate correct query for top-level collection', () => {
-      const collectionPath = 'users';
-      const options: QueryOptions = {
-        orderBy: [{ field: 'name', direction: 'ASCENDING' }],
-        limit: 10
-      };
-
-      const result = buildStructuredQuery(collectionPath, options);
-
-      expect(result).toEqual({
-        from: [{ collectionId: 'users' }],
-        orderBy: [{ field: { fieldPath: 'name' }, direction: 'ASCENDING' }],
-        limit: 10
-      });
-      
-      // Top-level collections should NOT have allDescendants flag
-      expect(result.from[0]).not.toHaveProperty('allDescendants');
-    });
-
-    it('should generate correct query for subcollection (1 level deep)', () => {
-      const collectionPath = 'users/user123/posts';
-      const options: QueryOptions = {
-        orderBy: [{ field: 'createdAt', direction: 'DESCENDING' }],
-        limit: 50
-      };
-
-      const result = buildStructuredQuery(collectionPath, options);
-
-      expect(result).toEqual({
-        from: [{ collectionId: 'posts', allDescendants: false }],
-        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-        limit: 50
-      });
-      
-      // Subcollections MUST have allDescendants: false
-      expect(result.from[0].allDescendants).toBe(false);
-    });
-
-    it('should generate correct query for subcollection (2 levels deep)', () => {
-      const collectionPath = 'conversations/main/messages';
-      const options: QueryOptions = {
-        orderBy: [{ field: 'timestamp', direction: 'DESCENDING' }],
-        limit: 50
-      };
-
-      const result = buildStructuredQuery(collectionPath, options);
-
-      expect(result).toEqual({
-        from: [{ collectionId: 'messages', allDescendants: false }],
-        orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
-        limit: 50
-      });
-      
-      expect(result.from[0].collectionId).toBe('messages');
-      expect(result.from[0].allDescendants).toBe(false);
-    });
-
-    it('should generate correct query for deep subcollection (3 levels deep)', () => {
-      const collectionPath = 'orgs/org1/teams/team1/members';
-      const options: QueryOptions = {
-        limit: 100
-      };
-
-      const result = buildStructuredQuery(collectionPath, options);
-
-      expect(result).toEqual({
-        from: [{ collectionId: 'members', allDescendants: false }],
-        limit: 100
-      });
-      
-      expect(result.from[0].collectionId).toBe('members');
-      expect(result.from[0].allDescendants).toBe(false);
-    });
-
-    it('should only use the last segment as collectionId', () => {
-      const paths = [
-        { path: 'users', expected: 'users' },
-        { path: 'users/u1/posts', expected: 'posts' },
-        { path: 'a/b/c/d/e', expected: 'e' },
-      ];
-
-      paths.forEach(({ path, expected }) => {
-        const result = buildStructuredQuery(path, {});
-        expect(result.from[0].collectionId).toBe(expected);
-      });
-    });
-  });
+describe('Firestore REST API Integration', () => {
 
   describe('Query URL generation (integration test)', () => {
     const FIRESTORE_API = 'https://firestore.googleapis.com/v1';

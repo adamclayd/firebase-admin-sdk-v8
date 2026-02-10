@@ -13,6 +13,9 @@ dist/
 .env.local
 .env.*.local
 
+# Secrets
+service-account.json
+
 # IDE
 .vscode/
 .idea/
