@@ -632,11 +632,23 @@ export async function queryDocuments(
   }
   
   // Use structured query for advanced filtering
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:runQuery`;
+  // For subcollections, we need to specify the parent document in the URL
+  const pathSegments = collectionPath.split('/');
+  let queryUrl: string;
+  
+  if (pathSegments.length > 1) {
+    // Subcollection: use parent document path in URL
+    // e.g., "users/user123/posts" -> URL ends with "users/user123:runQuery"
+    const parentPath = pathSegments.slice(0, -1).join('/');
+    queryUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${parentPath}:runQuery`;
+  } else {
+    // Top-level collection
+    queryUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:runQuery`;
+  }
   
   const structuredQuery = buildStructuredQuery(collectionPath, options);
   
-  const response = await fetch(url, {
+  const response = await fetch(queryUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
