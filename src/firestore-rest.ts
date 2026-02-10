@@ -221,8 +221,18 @@ function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): Dat
  * Build query body for structured queries
  */
 function buildStructuredQuery(collectionPath: string, options?: QueryOptions): any {
+  const pathSegments = collectionPath.split('/');
+  const collectionId = pathSegments[pathSegments.length - 1];
+  
+  const fromClause: any = { collectionId };
+  
+  // For subcollections, set allDescendants to false to query only direct children
+  if (pathSegments.length > 1) {
+    fromClause.allDescendants = false;
+  }
+  
   const query: any = {
-    from: [{ collectionId: collectionPath.split('/').pop() }],
+    from: [fromClause],
   };
 
   if (options?.where && options.where.length > 0) {
@@ -648,14 +658,6 @@ export async function queryDocuments(
   
   const structuredQuery = buildStructuredQuery(collectionPath, options);
   
-  // Debug logging
-  console.log('[queryDocuments] Debug:', {
-    collectionPath,
-    pathSegments,
-    queryUrl,
-    structuredQuery: JSON.stringify(structuredQuery, null, 2)
-  });
-  
   const response = await fetch(queryUrl, {
     method: 'POST',
     headers: {
@@ -667,16 +669,10 @@ export async function queryDocuments(
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[queryDocuments] Error response:', errorText);
     throw new Error(`Failed to query documents: ${errorText}`);
   }
   
   const results = await response.json();
-  console.log('[queryDocuments] Results:', {
-    resultCount: results.length,
-    hasDocuments: results.filter((r: any) => r.document).length,
-    firstResult: results[0]
-  });
   
   return results
     .filter((result: any) => result.document)
@@ -787,3 +783,4 @@ export async function batchWrite(operations: BatchWrite[]): Promise<BatchWriteRe
   
   return await response.json() as BatchWriteResult;
 }
+
