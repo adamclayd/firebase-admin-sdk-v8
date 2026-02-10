@@ -22,8 +22,9 @@ const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
 
 /**
  * Convert JavaScript value to Firestore format
+ * @internal - Exported for testing
  */
-function toFirestoreValue(value: any): FirestoreValue {
+export function toFirestoreValue(value: any): FirestoreValue {
   if (value === null || value === undefined) {
     return { nullValue: null };
   }
@@ -87,8 +88,9 @@ function toFirestoreValue(value: any): FirestoreValue {
 
 /**
  * Convert JavaScript object to Firestore format
+ * @internal - Exported for testing
  */
-function convertToFirestoreFormat(data: DataObject): Record<string, FirestoreValue> {
+export function convertToFirestoreFormat(data: DataObject): Record<string, FirestoreValue> {
   const result: Record<string, FirestoreValue> = {};
   
   for (const [key, value] of Object.entries(data)) {
@@ -100,8 +102,9 @@ function convertToFirestoreFormat(data: DataObject): Record<string, FirestoreVal
 
 /**
  * Extract field transforms from data (for increment, arrayUnion, etc.)
+ * @internal - Exported for testing
  */
-function extractFieldTransforms(data: DataObject, fieldPrefix = ''): any[] {
+export function extractFieldTransforms(data: DataObject, fieldPrefix = ''): any[] {
   const transforms: any[] = [];
   
   for (const [key, value] of Object.entries(data)) {
@@ -146,8 +149,9 @@ function extractFieldTransforms(data: DataObject, fieldPrefix = ''): any[] {
 
 /**
  * Remove FieldValue sentinels from data (they're handled via transforms)
+ * @internal - Exported for testing
  */
-function removeFieldTransforms(data: DataObject): DataObject {
+export function removeFieldTransforms(data: DataObject): DataObject {
   const result: DataObject = {};
   
   for (const [key, value] of Object.entries(data)) {
@@ -167,8 +171,9 @@ function removeFieldTransforms(data: DataObject): DataObject {
 
 /**
  * Convert Firestore value to JavaScript value
+ * @internal - Exported for testing
  */
-function fromFirestoreValue(value: FirestoreValue): any {
+export function fromFirestoreValue(value: FirestoreValue): any {
   if ('stringValue' in value) {
     return value.stringValue;
   }
@@ -206,8 +211,9 @@ function fromFirestoreValue(value: FirestoreValue): any {
 
 /**
  * Convert Firestore format to JavaScript object
+ * @internal - Exported for testing
  */
-function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): DataObject {
+export function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): DataObject {
   const result: DataObject = {};
   
   for (const [key, value] of Object.entries(fields)) {

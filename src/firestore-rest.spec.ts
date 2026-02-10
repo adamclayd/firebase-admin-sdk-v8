@@ -2,7 +2,16 @@
  * Unit test to verify structured query generation for subcollections
  */
 
-import { buildStructuredQuery } from './firestore-rest';
+import {
+  buildStructuredQuery,
+  toFirestoreValue,
+  fromFirestoreValue,
+  convertToFirestoreFormat,
+  convertFromFirestoreFormat,
+  extractFieldTransforms,
+  removeFieldTransforms,
+} from './firestore-rest';
+import { FieldValue } from './field-value';
 import type { QueryOptions } from './types';
 
 describe('Firestore Query Structure', () => {
@@ -142,4 +151,398 @@ describe('Firestore Query Structure', () => {
   // CRUD Operations tests to be added
   // Requires mocking getAdminAccessToken and getProjectId
   // See agent/tasks/test-firestore-rest.md for details
+
+  describe('Data Converters', () => {
+    describe('toFirestoreValue', () => {
+      it('should convert null to nullValue', () => {
+        const result = toFirestoreValue(null);
+        expect(result).toEqual({ nullValue: null });
+      });
+
+      it('should convert undefined to nullValue', () => {
+        const result = toFirestoreValue(undefined);
+        expect(result).toEqual({ nullValue: null });
+      });
+
+      it('should convert string to stringValue', () => {
+        const result = toFirestoreValue('hello');
+        expect(result).toEqual({ stringValue: 'hello' });
+      });
+
+      it('should convert boolean to booleanValue', () => {
+        expect(toFirestoreValue(true)).toEqual({ booleanValue: true });
+        expect(toFirestoreValue(false)).toEqual({ booleanValue: false });
+      });
+
+      it('should convert integer to integerValue', () => {
+        const result = toFirestoreValue(42);
+        expect(result).toEqual({ integerValue: '42' });
+      });
+
+      it('should convert float to doubleValue', () => {
+        const result = toFirestoreValue(3.14);
+        expect(result).toEqual({ doubleValue: 3.14 });
+      });
+
+      it('should convert Date to timestampValue', () => {
+        const date = new Date('2024-01-01T00:00:00.000Z');
+        const result = toFirestoreValue(date);
+        expect(result).toEqual({ timestampValue: '2024-01-01T00:00:00.000Z' });
+      });
+
+      it('should convert array to arrayValue', () => {
+        const result = toFirestoreValue([1, 'two', true]);
+        expect(result).toEqual({
+          arrayValue: {
+            values: [
+              { integerValue: '1' },
+              { stringValue: 'two' },
+              { booleanValue: true }
+            ]
+          }
+        });
+      });
+
+      it('should convert object to mapValue', () => {
+        const result = toFirestoreValue({ name: 'John', age: 30 });
+        expect(result).toEqual({
+          mapValue: {
+            fields: {
+              name: { stringValue: 'John' },
+              age: { integerValue: '30' }
+            }
+          }
+        });
+      });
+
+      it('should handle nested objects', () => {
+        const result = toFirestoreValue({
+          user: { name: 'John', tags: ['admin', 'user'] }
+        });
+        expect(result).toEqual({
+          mapValue: {
+            fields: {
+              user: {
+                mapValue: {
+                  fields: {
+                    name: { stringValue: 'John' },
+                    tags: {
+                      arrayValue: {
+                        values: [
+                          { stringValue: 'admin' },
+                          { stringValue: 'user' }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+      });
+    });
+
+    describe('fromFirestoreValue', () => {
+      it('should convert stringValue to string', () => {
+        const result = fromFirestoreValue({ stringValue: 'hello' });
+        expect(result).toBe('hello');
+      });
+
+      it('should convert integerValue to number', () => {
+        const result = fromFirestoreValue({ integerValue: '42' });
+        expect(result).toBe(42);
+      });
+
+      it('should convert doubleValue to number', () => {
+        const result = fromFirestoreValue({ doubleValue: 3.14 });
+        expect(result).toBe(3.14);
+      });
+
+      it('should convert booleanValue to boolean', () => {
+        expect(fromFirestoreValue({ booleanValue: true })).toBe(true);
+        expect(fromFirestoreValue({ booleanValue: false })).toBe(false);
+      });
+
+      it('should convert nullValue to null', () => {
+        const result = fromFirestoreValue({ nullValue: null });
+        expect(result).toBeNull();
+      });
+
+      it('should convert timestampValue to Date', () => {
+        const result = fromFirestoreValue({ timestampValue: '2024-01-01T00:00:00.000Z' });
+        expect(result).toBeInstanceOf(Date);
+        expect(result.toISOString()).toBe('2024-01-01T00:00:00.000Z');
+      });
+
+      it('should convert arrayValue to array', () => {
+        const result = fromFirestoreValue({
+          arrayValue: {
+            values: [
+              { integerValue: '1' },
+              { stringValue: 'two' },
+              { booleanValue: true }
+            ]
+          }
+        });
+        expect(result).toEqual([1, 'two', true]);
+      });
+
+      it('should convert mapValue to object', () => {
+        const result = fromFirestoreValue({
+          mapValue: {
+            fields: {
+              name: { stringValue: 'John' },
+              age: { integerValue: '30' }
+            }
+          }
+        });
+        expect(result).toEqual({ name: 'John', age: 30 });
+      });
+
+      it('should handle nested structures', () => {
+        const result = fromFirestoreValue({
+          mapValue: {
+            fields: {
+              user: {
+                mapValue: {
+                  fields: {
+                    name: { stringValue: 'John' },
+                    tags: {
+                      arrayValue: {
+                        values: [
+                          { stringValue: 'admin' },
+                          { stringValue: 'user' }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+        expect(result).toEqual({
+          user: { name: 'John', tags: ['admin', 'user'] }
+        });
+      });
+
+      it('should return null for unknown value types', () => {
+        const result = fromFirestoreValue({} as any);
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('Round-trip conversion', () => {
+      it('should preserve data through round-trip conversion', () => {
+        const original = {
+          string: 'hello',
+          number: 42,
+          float: 3.14,
+          boolean: true,
+          null: null,
+          array: [1, 2, 3],
+          nested: { key: 'value' }
+        };
+
+        const firestore = convertToFirestoreFormat(original);
+        const restored = convertFromFirestoreFormat(firestore);
+
+        expect(restored).toEqual(original);
+      });
+    });
+  });
+
+  describe('Field Transforms', () => {
+    describe('extractFieldTransforms', () => {
+      it('should extract serverTimestamp transform', () => {
+        const data = {
+          name: 'John',
+          createdAt: FieldValue.serverTimestamp()
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([
+          {
+            fieldPath: 'createdAt',
+            setToServerValue: 'REQUEST_TIME'
+          }
+        ]);
+      });
+
+      it('should extract increment transform', () => {
+        const data = {
+          count: FieldValue.increment(5)
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([
+          {
+            fieldPath: 'count',
+            increment: { integerValue: '5' }
+          }
+        ]);
+      });
+
+      it('should extract arrayUnion transform', () => {
+        const data = {
+          tags: FieldValue.arrayUnion('tag1', 'tag2')
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([
+          {
+            fieldPath: 'tags',
+            appendMissingElements: {
+              values: [
+                { stringValue: 'tag1' },
+                { stringValue: 'tag2' }
+              ]
+            }
+          }
+        ]);
+      });
+
+      it('should extract arrayRemove transform', () => {
+        const data = {
+          tags: FieldValue.arrayRemove('oldTag')
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([
+          {
+            fieldPath: 'tags',
+            removeAllFromArray: {
+              values: [{ stringValue: 'oldTag' }]
+            }
+          }
+        ]);
+      });
+
+      it('should extract multiple transforms', () => {
+        const data = {
+          createdAt: FieldValue.serverTimestamp(),
+          count: FieldValue.increment(1),
+          tags: FieldValue.arrayUnion('new')
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toHaveLength(3);
+        expect(transforms[0].fieldPath).toBe('createdAt');
+        expect(transforms[1].fieldPath).toBe('count');
+        expect(transforms[2].fieldPath).toBe('tags');
+      });
+
+      it('should return empty array for no transforms', () => {
+        const data = {
+          name: 'John',
+          age: 30
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([]);
+      });
+
+      it('should not extract delete field values', () => {
+        const data = {
+          name: 'John',
+          oldField: FieldValue.delete()
+        };
+
+        const transforms = extractFieldTransforms(data);
+
+        expect(transforms).toEqual([]);
+      });
+    });
+
+    describe('removeFieldTransforms', () => {
+      it('should remove serverTimestamp', () => {
+        const data = {
+          name: 'John',
+          createdAt: FieldValue.serverTimestamp()
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+
+      it('should remove increment', () => {
+        const data = {
+          name: 'John',
+          count: FieldValue.increment(1)
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+
+      it('should remove arrayUnion', () => {
+        const data = {
+          name: 'John',
+          tags: FieldValue.arrayUnion('tag')
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+
+      it('should remove arrayRemove', () => {
+        const data = {
+          name: 'John',
+          tags: FieldValue.arrayRemove('tag')
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+
+      it('should remove delete field', () => {
+        const data = {
+          name: 'John',
+          oldField: FieldValue.delete()
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+
+      it('should keep regular fields', () => {
+        const data = {
+          name: 'John',
+          age: 30,
+          active: true
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual(data);
+      });
+
+      it('should remove all FieldValue sentinels', () => {
+        const data = {
+          name: 'John',
+          createdAt: FieldValue.serverTimestamp(),
+          count: FieldValue.increment(1),
+          tags: FieldValue.arrayUnion('tag'),
+          oldTags: FieldValue.arrayRemove('old'),
+          deletedField: FieldValue.delete()
+        };
+
+        const result = removeFieldTransforms(data);
+
+        expect(result).toEqual({ name: 'John' });
+      });
+    });
+  });
 });
