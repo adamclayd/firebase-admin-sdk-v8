@@ -219,8 +219,9 @@ function convertFromFirestoreFormat(fields: Record<string, FirestoreValue>): Dat
 
 /**
  * Build query body for structured queries
+ * @internal - Exported for testing
  */
-function buildStructuredQuery(collectionPath: string, options?: QueryOptions): any {
+export function buildStructuredQuery(collectionPath: string, options?: QueryOptions): any {
   const pathSegments = collectionPath.split('/');
   const collectionId = pathSegments[pathSegments.length - 1];
   

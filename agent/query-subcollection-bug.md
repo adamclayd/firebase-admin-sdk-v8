@@ -6,9 +6,23 @@
 
 ## Evidence
 
-**Direct REST API (works):**
+**Direct GET (works):**
 ```bash
 curl https://firestore.googleapis.com/v1/projects/com-f5-parm/databases/(default)/documents/e0.agentbase.conversations/main/messages
+# Returns 11 messages ✅
+```
+
+**runQuery with correct format (works):**
+```bash
+curl -X POST https://firestore.googleapis.com/v1/projects/com-f5-parm/databases/(default)/documents/e0.agentbase.conversations/main:runQuery \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "structuredQuery": {
+      "from": [{"collectionId": "messages", "allDescendants": false}],
+      "orderBy": [{"field": {"fieldPath": "timestamp"}, "direction": "DESCENDING"}],
+      "limit": 50
+    }
+  }'
 # Returns 11 messages ✅
 ```
 
@@ -23,10 +37,52 @@ await queryDocuments('e0.agentbase.conversations/main/messages', {
 
 ## Root Cause
 
-The `queryDocuments` function likely has a bug with subcollection paths. It may be:
-1. Not constructing the REST API URL correctly for subcollections
-2. Not handling the response correctly
-3. Filtering out subcollection results
+**The library is using the wrong API endpoint for subcollections.**
+
+**Current (wrong):**
+- Tries to query the full path directly
+- Doesn't work for subcollections
+
+**Correct:**
+- For subcollections, use `:runQuery` endpoint on the parent document
+- Put subcollection name in `structuredQuery.from[0].collectionId`
+- Parent path: `e0.agentbase.conversations/main`
+- Subcollection: `messages`
+
+## Fix Implementation
+
+**Detect subcollection:**
+```typescript
+function isSubcollection(path: string): boolean {
+  // Count slashes - if more than collection name, it's a subcollection
+  const parts = path.split('/');
+  return parts.length > 1;
+}
+```
+
+**Build correct URL:**
+```typescript
+if (isSubcollection(collectionPath)) {
+  // Split into parent path and subcollection name
+  const parts = collectionPath.split('/');
+  const subcollectionName = parts[parts.length - 1];
+  const parentPath = parts.slice(0, -1).join('/');
+  
+  // Use :runQuery on parent
+  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${parentPath}:runQuery`;
+  
+  // Put subcollection in query body
+  const body = {
+    structuredQuery: {
+      from: [{
+        collectionId: subcollectionName,
+        allDescendants: false
+      }],
+      // ... rest of query
+    }
+  };
+}
+```
 
 ## Impact
 
@@ -34,28 +90,17 @@ The `queryDocuments` function likely has a bug with subcollection paths. It may 
 - Messages are saved ✅
 - Messages exist in database ✅
 - Direct REST API works ✅
+- runQuery format works ✅
 - queryDocuments fails ❌
-
-## Workaround
-
-Use direct REST API calls instead of queryDocuments for subcollections:
-
-```typescript
-const token = await getAdminAccessToken();
-const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionPath}`;
-
-const response = await fetch(url, {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-
-const data = await response.json();
-// Parse data.documents manually
-```
-
-## Fix Needed
-
-Update `queryDocuments` in firebase-admin-sdk-v8 to properly handle subcollection paths.
 
 ## Priority
 
 **CRITICAL** - Blocks message loading in production
+
+## Verified Working
+
+**Test Results:**
+- 11 messages in `e0.agentbase.conversations/main/messages`
+- runQuery returns all messages with correct ordering
+- Bedrock responses present ("4 + 4 = 8")
+- Format is correct, just needs library implementation
