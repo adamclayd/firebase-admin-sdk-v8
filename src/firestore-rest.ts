@@ -25,6 +25,10 @@ import {
   buildStructuredQuery,
   mapWhereOp,
 } from './firestore/query-builder';
+import {
+  extractFieldTransforms,
+  removeFieldTransforms,
+} from './firestore/transforms';
 
 const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
 
@@ -42,76 +46,11 @@ export {
   mapWhereOp,
 };
 
-/**
- * Extract field transforms from data (for increment, arrayUnion, etc.)
- * @internal - Exported for testing
- */
-export function extractFieldTransforms(data: DataObject, fieldPrefix = ''): any[] {
-  const transforms: any[] = [];
-  
-  for (const [key, value] of Object.entries(data)) {
-    const fieldPath = fieldPrefix ? `${fieldPrefix}.${key}` : key;
-    
-    if (isFieldValue(value)) {
-      switch (value._type) {
-        case 'serverTimestamp':
-          transforms.push({
-            fieldPath,
-            setToServerValue: 'REQUEST_TIME',
-          });
-          break;
-        case 'increment':
-          transforms.push({
-            fieldPath,
-            increment: toFirestoreValue(value._value),
-          });
-          break;
-        case 'arrayUnion':
-          transforms.push({
-            fieldPath,
-            appendMissingElements: {
-              values: value._value.map((v: any) => toFirestoreValue(v)),
-            },
-          });
-          break;
-        case 'arrayRemove':
-          transforms.push({
-            fieldPath,
-            removeAllFromArray: {
-              values: value._value.map((v: any) => toFirestoreValue(v)),
-            },
-          });
-          break;
-      }
-    }
-  }
-  
-  return transforms;
-}
-
-/**
- * Remove FieldValue sentinels from data (they're handled via transforms)
- * @internal - Exported for testing
- */
-export function removeFieldTransforms(data: DataObject): DataObject {
-  const result: DataObject = {};
-  
-  for (const [key, value] of Object.entries(data)) {
-    if (isFieldValue(value)) {
-      if (value._type === 'delete') {
-        // Skip delete fields - they're handled via updateMask
-        continue;
-      }
-      // Skip transform fields - they're handled separately
-      continue;
-    }
-    result[key] = value;
-  }
-  
-  return result;
-}
-
-
+// Re-export transform functions for backward compatibility and testing
+export {
+  extractFieldTransforms,
+  removeFieldTransforms,
+};
 
 /**
  * Set a document in Firestore (create or overwrite)
