@@ -528,4 +528,183 @@ describe('Firestore E2E Tests', () => {
       expect(doc?.age).toBe(25); // Should NOT be updated (not in mergeFields)
     });
   });
+
+  describe('Error Handling', () => {
+    it('should throw error when getting non-existent document', async () => {
+      const nonExistentId = `test-${timestamp}-nonexistent`;
+      const doc = await getDocument(TEST_COLLECTION, nonExistentId);
+      expect(doc).toBeNull();
+    });
+
+    it('should throw error when updating non-existent document', async () => {
+      const nonExistentId = `test-${timestamp}-update-nonexistent`;
+      await expect(
+        updateDocument(TEST_COLLECTION, nonExistentId, { name: 'Updated' })
+      ).rejects.toThrow();
+    });
+
+    it('should handle deleting non-existent document gracefully', async () => {
+      const nonExistentId = `test-${timestamp}-delete-nonexistent`;
+      // Should not throw error
+      await expect(
+        deleteDocument(TEST_COLLECTION, nonExistentId)
+      ).resolves.not.toThrow();
+    });
+
+    it('should handle empty query results', async () => {
+      const results = await queryDocuments(TEST_COLLECTION, {
+        where: [{ field: 'nonExistentField', op: '==', value: 'impossible-value-12345' }],
+      });
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    const edgeTestDocs: string[] = [];
+
+    afterAll(async () => {
+      for (const docId of edgeTestDocs) {
+        try {
+          await deleteDocument(TEST_COLLECTION, docId);
+        } catch (error) {
+          // Ignore
+        }
+      }
+    });
+
+    it('should handle documents with special characters in IDs', async () => {
+      const docId = `test-${timestamp}-special_chars.with-dashes`;
+      edgeTestDocs.push(docId);
+
+      await setDocument(TEST_COLLECTION, docId, {
+        name: 'Special Chars Test',
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.name).toBe('Special Chars Test');
+    });
+
+    it('should handle documents with unicode characters', async () => {
+      const docId = `test-${timestamp}-unicode`;
+      edgeTestDocs.push(docId);
+
+      await setDocument(TEST_COLLECTION, docId, {
+        name: 'Unicode Test',
+        emoji: '🔥',
+        chinese: '你好',
+        arabic: 'مرحبا',
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.emoji).toBe('🔥');
+      expect(doc?.chinese).toBe('你好');
+      expect(doc?.arabic).toBe('مرحبا');
+    });
+
+    it('should handle deeply nested objects', async () => {
+      const docId = `test-${timestamp}-nested`;
+      edgeTestDocs.push(docId);
+
+      await setDocument(TEST_COLLECTION, docId, {
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                value: 'deep',
+              },
+            },
+          },
+        },
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.level1?.level2?.level3?.level4?.value).toBe('deep');
+    });
+
+    it('should handle large arrays', async () => {
+      const docId = `test-${timestamp}-large-array`;
+      edgeTestDocs.push(docId);
+
+      const largeArray = Array.from({ length: 100 }, (_, i) => ({
+        id: i,
+        value: `item-${i}`,
+      }));
+
+      await setDocument(TEST_COLLECTION, docId, {
+        items: largeArray,
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.items).toHaveLength(100);
+      expect(doc?.items[0].id).toBe(0);
+      expect(doc?.items[99].id).toBe(99);
+    });
+
+    it('should handle empty objects and arrays', async () => {
+      const docId = `test-${timestamp}-empty`;
+      edgeTestDocs.push(docId);
+
+      await setDocument(TEST_COLLECTION, docId, {
+        emptyObject: {},
+        emptyArray: [],
+        emptyString: '',
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.emptyObject).toEqual({});
+      expect(doc?.emptyArray).toEqual([]);
+      expect(doc?.emptyString).toBe('');
+    });
+
+    it('should handle null and undefined values', async () => {
+      const docId = `test-${timestamp}-null`;
+      edgeTestDocs.push(docId);
+
+      await setDocument(TEST_COLLECTION, docId, {
+        nullValue: null,
+        normalValue: 'test',
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.nullValue).toBeNull();
+      expect(doc?.normalValue).toBe('test');
+    });
+
+    it('should handle very long strings', async () => {
+      const docId = `test-${timestamp}-long-string`;
+      edgeTestDocs.push(docId);
+
+      const longString = 'a'.repeat(10000); // 10KB string
+
+      await setDocument(TEST_COLLECTION, docId, {
+        longText: longString,
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.longText).toHaveLength(10000);
+    });
+
+    it('should handle documents with many fields', async () => {
+      const docId = `test-${timestamp}-many-fields`;
+      edgeTestDocs.push(docId);
+
+      const manyFields: any = { _test: true };
+      for (let i = 0; i < 50; i++) {
+        manyFields[`field${i}`] = `value${i}`;
+      }
+
+      await setDocument(TEST_COLLECTION, docId, manyFields);
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      expect(doc?.field0).toBe('value0');
+      expect(doc?.field49).toBe('value49');
+    });
+  });
 });
