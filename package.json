@@ -25,7 +25,8 @@
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "publish": "npm run build && npm publish"
   },
   "keywords": [
     "firebase",
