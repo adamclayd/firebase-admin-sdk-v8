@@ -5,16 +5,16 @@
 project:
   name: firebase-admin-sdk-v8
   total_source_files: 8
-  total_tests: 76
+  total_tests: 111
   total_test_suites: 3
-  coverage_current: 17.1
+  coverage_current: 31.66
   coverage_target: 80
   last_updated: 2026-02-10
   coverage_by_metric:
-    statements: 17.1
-    branches: 15.78
-    functions: 15.85
-    lines: 17.19
+    statements: 31.66
+    branches: 35.22
+    functions: 27.71
+    lines: 32.15
 
 files:
   - name: field-value.ts
@@ -31,7 +31,7 @@ files:
     status: complete
     test_file: src/config.spec.ts
     tests_count: 25
-    coverage: 95
+    coverage: 100
     priority: high
     estimated_hours: 2-3
     completed_date: 2026-02-10
@@ -40,18 +40,22 @@ files:
   - name: firestore-rest.ts
     status: partial
     test_file: src/firestore-rest.spec.ts
-    tests_count: 9
-    coverage: 15
+    tests_count: 44
+    coverage: 40.62
     priority: high
-    estimated_hours: 4-6
+    estimated_hours: 2-4
     started_date: 2026-02-10
     notes: |
-      Query structure complete. Still need:
-      - CRUD operations (setDocument, getDocument, updateDocument, deleteDocument, addDocument)
+      Completed:
+      - Query structure and URL generation
+      - Data converters (toFirestoreValue, fromFirestoreValue)
+      - Field transforms (extractFieldTransforms, removeFieldTransforms)
+      - Fixed updateMask bug
+      
+      Still need:
+      - CRUD operations with mocked fetch
       - queryDocuments integration tests
       - batchWrite tests
-      - Data converter tests
-      - Field transform tests
 
   - name: auth.ts
     status: pending
