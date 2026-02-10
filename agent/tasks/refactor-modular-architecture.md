@@ -1,31 +1,53 @@
 # Task: Refactor Library into Modular, Testable Files
 
 ## Objective
-Break up the firebase-admin-sdk-v8 library into smaller, more modular files that are easier to test, maintain, and understand.
+Break up the firebase-admin-sdk-v8 library into smaller, more modular files that are easier to test, maintain, and understand, following patterns from the official firebase-admin-node SDK while maintaining zero dependencies.
 
 ## Current State
-- Large monolithic files (e.g., `firestore-rest.ts` is 787 lines)
+- Large monolithic files (e.g., `firestore-rest.ts` was 787 lines, now 681 after Phase 1)
 - Mixed concerns (data conversion, query building, API calls all in one file)
-- Limited test coverage
-- Internal functions not easily testable
+- Test coverage: 31.66% (target: 80%)
+- Phase 1 complete: Converters extracted ✅
+
+## Reference: Official firebase-admin-node Structure
+
+The official SDK uses a clean modular structure:
+```
+src/
+├── app/                    # App initialization
+├── auth/                   # Authentication
+├── firestore/              # Firestore (wraps @google-cloud/firestore)
+│   ├── firestore-internal.ts
+│   ├── firestore-namespace.ts
+│   └── index.ts
+├── database/               # Realtime Database
+├── messaging/              # Cloud Messaging
+└── ...
+```
+
+**Key Insights:**
+- Each service in its own directory
+- Thin wrapper pattern (internal + namespace + index)
+- Clear separation between public API and implementation
+- Uses barrel exports (index.ts) for clean imports
 
 ## Proposed Structure
 
 ### 1. Firestore Module Breakdown
 
-**Current**: `src/firestore-rest.ts` (787 lines)
+**Current**: `src/firestore-rest.ts` (681 lines after Phase 1)
 
-**Proposed**:
+**Completed (Phase 1):**
 ```
 src/firestore/
-├── index.ts                    # Public API exports
-├── client.ts                   # Main Firestore client class
-├── converters.ts               # Data format conversion utilities
-│   ├── toFirestoreValue()
-│   ├── fromFirestoreValue()
-│   ├── convertToFirestoreFormat()
-│   └── convertFromFirestoreFormat()
-├── converters.spec.ts          # Tests for converters
+├── converters.ts               # ✅ Data format conversion utilities
+├── converters.spec.ts          # ✅ 22 tests, 100% coverage
+```
+
+**Remaining Phases:**
+```
+src/firestore/
+├── index.ts                    # Public API barrel export
 ├── transforms.ts               # Field transform handling
 │   ├── extractFieldTransforms()
 │   └── removeFieldTransforms()
@@ -34,7 +56,7 @@ src/firestore/
 │   ├── buildStructuredQuery()
 │   └── mapWhereOp()
 ├── query-builder.spec.ts       # Tests for query builder
-├── operations.ts               # CRUD operations
+├── operations.ts               # CRUD operations (REST API calls)
 │   ├── setDocument()
 │   ├── getDocument()
 │   ├── updateDocument()
@@ -47,47 +69,58 @@ src/firestore/
 └── batch.spec.ts               # Tests for batch
 ```
 
+**Note**: Unlike firebase-admin-node which wraps @google-cloud/firestore, we implement direct REST API calls with zero dependencies.
+
 ### 2. Auth Module Breakdown
 
-**Current**: `src/auth.ts`
+**Current**: `src/auth.ts` (256 lines, 0% coverage)
 
 **Proposed**:
 ```
 src/auth/
 ├── index.ts                    # Public API exports
-├── token-verifier.ts           # JWT verification logic
+├── token-verifier.ts           # JWT verification using Web Crypto API
 ├── token-verifier.spec.ts      # Tests for verification
-├── claims.ts                   # Custom claims handling
-└── claims.spec.ts              # Tests for claims
+├── public-keys.ts              # Public key fetching and caching
+├── public-keys.spec.ts         # Tests for key management
+└── claims.ts                   # Custom claims via REST API
 ```
+
+**Note**: Unlike firebase-admin-node which uses jsonwebtoken + jwks-rsa libraries, we use Web Crypto API and manual key management.
 
 ### 3. Token Generation Module
 
-**Current**: `src/token-generation.ts`
+**Current**: `src/token-generation.ts` (134 lines, 14% coverage)
 
 **Proposed**:
 ```
 src/token/
 ├── index.ts                    # Public API exports
-├── generator.ts                # Token generation
+├── generator.ts                # JWT generation using Web Crypto API
 ├── generator.spec.ts           # Tests for generation
+├── signer.ts                   # RSA signing with Web Crypto
+├── signer.spec.ts              # Tests for signing
 ├── cache.ts                    # Token caching logic
 └── cache.spec.ts               # Tests for cache
 ```
 
+**Note**: Unlike firebase-admin-node which uses google-auth-library, we implement OAuth2 JWT flow manually with Web Crypto API.
+
 ### 4. X.509 Certificate Module
 
-**Current**: `src/x509.ts`
+**Current**: `src/x509.ts` (139 lines, 0% coverage)
 
 **Proposed**:
 ```
 src/x509/
 ├── index.ts                    # Public API exports
-├── parser.ts                   # Certificate parsing
+├── parser.ts                   # Manual PEM/DER parsing
 ├── parser.spec.ts              # Tests for parser
 ├── validator.ts                # Certificate validation
 └── validator.spec.ts           # Tests for validation
 ```
+
+**Note**: Unlike firebase-admin-node which uses node-forge library, we implement X.509 parsing manually to avoid dependencies.
 
 ## Benefits
 
@@ -118,11 +151,12 @@ src/x509/
 
 ## Implementation Plan
 
-### Phase 1: Firestore Converters (High Priority)
-1. Extract data conversion functions to `src/firestore/converters.ts`
-2. Add comprehensive tests in `src/firestore/converters.spec.ts`
-3. Update imports in `firestore-rest.ts`
-4. Verify all existing tests still pass
+### Phase 1: Firestore Converters ✅ COMPLETE
+1. ✅ Extracted data conversion functions to `src/firestore/converters.ts`
+2. ✅ Added 22 comprehensive tests in `src/firestore/converters.spec.ts`
+3. ✅ Updated imports in `firestore-rest.ts`
+4. ✅ All 133 tests passing
+5. ✅ Re-exported for backward compatibility
 
 ### Phase 2: Firestore Query Builder (High Priority)
 1. Extract `buildStructuredQuery` and `mapWhereOp` to `src/firestore/query-builder.ts`
@@ -198,16 +232,35 @@ src/x509/
 
 ## Timeline
 
-- **Phase 1-2**: 1-2 days (High priority, immediate value)
-- **Phase 3-4**: 2-3 days (Medium priority)
-- **Phase 5-6**: 2-3 days (Low priority, can be deferred)
+- **Phase 1**: ✅ COMPLETE (Converters extracted)
+- **Phase 2**: 2-4 hours (Query builder extraction)
+- **Phase 3**: 2-4 hours (Transforms extraction)
+- **Phase 4**: 4-6 hours (Operations extraction)
+- **Phase 5-6**: 4-6 hours (Auth & Token modules)
 
-**Total Estimated Time**: 5-8 days
+**Remaining Time**: 12-20 hours
 
 ## Notes
 
 - This refactor should not change any external behavior
 - Focus on internal code organization and testability
 - Keep the public API surface the same
-- Consider using barrel exports (index.ts files) for clean imports
-- May want to add a build step to bundle modules for distribution
+- Use barrel exports (index.ts files) like firebase-admin-node
+- Must maintain zero dependencies (unlike firebase-admin-node)
+- Use Web Crypto API instead of Node.js crypto or libraries
+- Direct REST API calls instead of Google Cloud client libraries
+- See [`agent/comparison.md`](../comparison.md) for detailed comparison with official SDK
+
+## Lessons from firebase-admin-node
+
+### What to Adopt
+1. **Modular directory structure** - Each service in its own directory
+2. **Barrel exports** - Clean public API via index.ts files
+3. **Separation of concerns** - Internal implementation vs public API
+4. **Comprehensive testing** - Each module has its own test file
+
+### What to Avoid
+1. **External dependencies** - We must stay dependency-free for edge runtimes
+2. **Node.js-specific APIs** - Must use Web standards (fetch, Web Crypto)
+3. **Complex abstractions** - Keep it simple and understandable
+4. **Large bundle size** - Stay lightweight (~28KB vs their much larger size)
