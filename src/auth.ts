@@ -23,6 +23,15 @@ let publicKeysCache: Record<string, string> | null = null;
 let publicKeysCacheExpiry: number = 0;
 
 /**
+ * Clear the public keys cache (for testing)
+ * @internal
+ */
+export function clearPublicKeysCache(): void {
+  publicKeysCache = null;
+  publicKeysCacheExpiry = 0;
+}
+
+/**
  * Fetch Google's public keys for Firebase token verification
  * Supports both securetoken (v9) and session (v10) endpoints
  */
