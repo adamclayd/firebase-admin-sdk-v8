@@ -40,8 +40,11 @@ describe('Firestore E2E Tests', () => {
     const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf-8');
     const serviceAccount = JSON.parse(serviceAccountJson);
     
-    // Initialize with service account
-    initializeApp({ serviceAccount });
+    // Initialize with service account and project ID
+    initializeApp({
+      serviceAccount,
+      projectId: 'prmichaelsen-firebase-e2e',
+    });
   });
 
   afterEach(async () => {
