@@ -359,15 +359,27 @@ refactoring_tasks:
       - Verified with e2e tests (15/15 passing)
 
 next_steps:
-  - Publish v2.2.0 or v2.3.0 (Storage + Custom Tokens milestone!)
+  - Address critical security issues from Audit #001
+  - Implement H-001: JWT algorithm validation (HIGH priority)
+  - Implement H-002: UID input validation (HIGH priority)
+  - Implement H-003: Custom claims validation (HIGH priority)
+  - Implement H-004: Signed URL timing attack fixes (HIGH priority)
+  - Implement M-001: Rate limiting (MEDIUM priority)
+  - Implement M-004: Firestore path injection fixes (MEDIUM priority)
+  - Publish v2.2.1 or v2.3.0 with security fixes
   - Add unit tests for Storage module (currently only e2e)
   - Consider Firestore transactions implementation
   - Consider User Management APIs
-  - Add more comprehensive error handling
-  - Document Storage API usage
-  - Update README with Storage examples
 
-blockers: []
+blockers:
+  - name: Security vulnerabilities
+    severity: high
+    description: Security Audit #001 identified 2 critical and 4 high-priority issues that should be addressed before next release
+    tasks:
+      - agent/tasks/security-h001-jwt-algorithm-validation.md
+      - agent/tasks/security-h002-uid-input-validation.md
+      - agent/tasks/security-h003-custom-claims-validation.md
+      - agent/tasks/security-h004-signed-url-timing-attack.md
 
 bugs_fixed:
   - name: Subcollection query bug
@@ -568,6 +580,95 @@ achievements:
       Updated files:
       - src/index.ts: Exported storage functions and types
       - README.md: Added storage documentation
+
+  - name: Security Audit #001
+    date: 2026-02-11
+    description: |
+      Comprehensive security audit completed
+      
+      Overall Security Posture: MODERATE
+      
+      Issues Identified:
+      - 2 Critical: Service account exposure risk, insecure token caching
+      - 4 High Priority: JWT validation, UID validation, claims validation, signed URL timing
+      - 6 Medium Priority: Rate limiting, error sanitization, path validation, etc.
+      - 3 Low Priority: Documentation, scanning, disclosure policy
+      - 5 Informational: Positive security practices documented
+      
+      Critical Findings:
+      - C-001: Service account credentials exposure risk
+      - C-002: Insecure token caching in plain-text memory
+      
+      High Priority Findings:
+      - H-001: JWT algorithm confusion vulnerability
+      - H-002: Insufficient UID input validation
+      - H-003: Insecure custom claims validation
+      - H-004: Signed URL timing attack vulnerability
+      
+      Positive Findings:
+      - Zero runtime dependencies (excellent security posture)
+      - Proper use of Web Crypto API
+      - Secure cryptographic algorithms (RS256, SHA-256)
+      - 98.02% test coverage
+      - Good secret management practices
+      
+      Audit Report: agent/security/audit_001.md
+      Next Audit: 2026-08-11 (6 months)
+
+security_tasks:
+  - name: H-001 - JWT Algorithm Validation
+    file: agent/tasks/security-h001-jwt-algorithm-validation.md
+    status: pending
+    priority: high
+    severity: high
+    estimated_hours: 2-3
+    created_date: 2026-02-11
+    notes: Fix JWT algorithm confusion vulnerability with normalization and allowlist
+    
+  - name: H-002 - UID Input Validation
+    file: agent/tasks/security-h002-uid-input-validation.md
+    status: pending
+    priority: high
+    severity: high
+    estimated_hours: 2-3
+    created_date: 2026-02-11
+    notes: Add comprehensive UID validation with character allowlist and injection prevention
+    
+  - name: H-003 - Custom Claims Validation
+    file: agent/tasks/security-h003-custom-claims-validation.md
+    status: pending
+    priority: high
+    severity: high
+    estimated_hours: 2-3
+    created_date: 2026-02-11
+    notes: Add custom claims validation with size limits and reserved claim protection
+    
+  - name: H-004 - Signed URL Timing Attack
+    file: agent/tasks/security-h004-signed-url-timing-attack.md
+    status: pending
+    priority: high
+    severity: high
+    estimated_hours: 3-4
+    created_date: 2026-02-11
+    notes: Implement constant-time comparison and expiration validation
+    
+  - name: M-001 - Rate Limiting
+    file: agent/tasks/security-m001-rate-limiting.md
+    status: pending
+    priority: medium
+    severity: medium
+    estimated_hours: 3-4
+    created_date: 2026-02-11
+    notes: Add optional rate limiting for token generation endpoints
+    
+  - name: M-004 - Firestore Path Injection
+    file: agent/tasks/security-m004-firestore-path-injection.md
+    status: pending
+    priority: medium
+    severity: medium
+    estimated_hours: 2-3
+    created_date: 2026-02-11
+    notes: Enhance path validation to prevent injection attacks
 
 notes: |
   - All tests use Jest
