@@ -10,7 +10,7 @@
  */
 
 import { initializeApp } from './config';
-import { verifyIdToken, getUserFromToken, createCustomToken } from './auth';
+import { verifyIdToken, getUserFromToken, createCustomToken, signInWithCustomToken } from './auth';
 import { getAdminAccessToken } from './token-generation';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -241,6 +241,63 @@ describe('Auth E2E Tests', () => {
     it('should throw error for invalid UID', async () => {
       await expect(createCustomToken('')).rejects.toThrow('uid must be a non-empty string');
       await expect(createCustomToken('a'.repeat(129))).rejects.toThrow('uid must be at most 128 characters');
+    });
+  });
+
+  describe('Custom Token Authentication Flow (E2E)', () => {
+    // Note: This test requires FIREBASE_API_KEY environment variable to be set
+    // Skip if API key is not configured
+    const hasApiKey = process.env.FIREBASE_API_KEY || process.env.PUBLIC_FIREBASE_API_KEY;
+
+    (hasApiKey ? it : it.skip)('should complete full auth flow: create token → exchange → verify', async () => {
+      const uid = `e2e-test-${Date.now()}`;
+      const customClaims = {
+        role: 'tester',
+        testRun: true,
+        timestamp: Date.now(),
+      };
+      
+      // Step 1: Create custom token
+      const customToken = await createCustomToken(uid, customClaims);
+      expect(customToken).toBeDefined();
+      expect(typeof customToken).toBe('string');
+      expect(customToken.split('.').length).toBe(3);
+      
+      // Step 2: Exchange for ID token
+      const credentials = await signInWithCustomToken(customToken);
+      
+      expect(credentials.idToken).toBeDefined();
+      expect(credentials.refreshToken).toBeDefined();
+      expect(credentials.expiresIn).toBe('3600');
+      
+      // Step 3: Verify the ID token
+      const decodedToken = await verifyIdToken(credentials.idToken);
+      expect(decodedToken.uid).toBe(uid);
+      // Custom claims are included in the decoded token
+      expect((decodedToken as any).role).toBe('tester');
+      expect((decodedToken as any).testRun).toBe(true);
+    }, 30000);
+
+    (!hasApiKey ? it : it.skip)('should skip e2e test when API key is not configured', () => {
+      // This test runs when API key is not set to document the requirement
+      expect(true).toBe(true);
+      console.log('Skipping signInWithCustomToken e2e test: FIREBASE_API_KEY not configured');
+    });
+
+    it('should throw error when API key is missing', async () => {
+      // Temporarily unset API key
+      const originalApiKey = process.env.FIREBASE_API_KEY;
+      const originalPublicApiKey = process.env.PUBLIC_FIREBASE_API_KEY;
+      delete process.env.FIREBASE_API_KEY;
+      delete process.env.PUBLIC_FIREBASE_API_KEY;
+
+      const customToken = await createCustomToken('test-user');
+      
+      await expect(signInWithCustomToken(customToken)).rejects.toThrow('Firebase API key not configured');
+
+      // Restore API keys
+      if (originalApiKey) process.env.FIREBASE_API_KEY = originalApiKey;
+      if (originalPublicApiKey) process.env.PUBLIC_FIREBASE_API_KEY = originalPublicApiKey;
     });
   });
 });

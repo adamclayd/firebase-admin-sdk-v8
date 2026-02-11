@@ -22,7 +22,7 @@ export interface CustomTokenSignInResponse {
   idToken: string;
   refreshToken: string;
   expiresIn: string;
-  localId: string;
+  isNewUser?: boolean;
 }
 
 /**
@@ -455,7 +455,7 @@ export async function signInWithCustomToken(
     idToken: result.idToken,
     refreshToken: result.refreshToken,
     expiresIn: result.expiresIn,
-    localId: result.localId,
+    isNewUser: result.isNewUser,
   };
 }
 

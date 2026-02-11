@@ -3,7 +3,7 @@
  * Tests JWT verification with mocked crypto and fetch
  */
 
-import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache, createCustomToken } from './auth';
+import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache, createCustomToken, signInWithCustomToken } from './auth';
 import * as serviceAccount from './service-account';
 import * as config from './config';
 import * as x509 from './x509';
@@ -15,6 +15,7 @@ jest.mock('./x509');
 
 const mockGetProjectId = serviceAccount.getProjectId as jest.MockedFunction<typeof serviceAccount.getProjectId>;
 const mockGetServiceAccount = config.getServiceAccount as jest.MockedFunction<typeof config.getServiceAccount>;
+const mockGetFirebaseApiKey = config.getFirebaseApiKey as jest.MockedFunction<typeof config.getFirebaseApiKey>;
 const mockImportPublicKeyFromX509 = x509.importPublicKeyFromX509 as jest.MockedFunction<typeof x509.importPublicKeyFromX509>;
 
 describe('Authentication', () => {
@@ -555,6 +556,186 @@ describe('Authentication', () => {
       const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
       
       expect(payload.claims).toEqual(customClaims);
+    });
+  });
+
+  describe('signInWithCustomToken', () => {
+    const mockApiKey = 'AIzaSyTest123ApiKey';
+
+    beforeEach(() => {
+      mockGetFirebaseApiKey.mockReturnValue(mockApiKey);
+      
+      // Mock successful fetch response
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          idToken: 'mock-id-token',
+          refreshToken: 'mock-refresh-token',
+          expiresIn: '3600',
+          isNewUser: false,
+        }),
+      });
+    });
+
+    it('should exchange custom token for ID token', async () => {
+      const customToken = 'mock-custom-token';
+      const result = await signInWithCustomToken(customToken);
+
+      expect(result.idToken).toBe('mock-id-token');
+      expect(result.refreshToken).toBe('mock-refresh-token');
+      expect(result.expiresIn).toBe('3600');
+    });
+
+    it('should call Identity Toolkit API with correct URL', async () => {
+      const customToken = 'mock-custom-token';
+      await signInWithCustomToken(customToken);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${mockApiKey}`,
+        expect.any(Object)
+      );
+    });
+
+    it('should send correct request body', async () => {
+      const customToken = 'mock-custom-token';
+      await signInWithCustomToken(customToken);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: customToken,
+            returnSecureToken: true,
+          }),
+        }
+      );
+    });
+
+    it('should throw error for empty custom token', async () => {
+      await expect(signInWithCustomToken('')).rejects.toThrow('customToken must be a non-empty string');
+    });
+
+    it('should throw error for non-string custom token', async () => {
+      await expect(signInWithCustomToken(null as any)).rejects.toThrow('customToken must be a non-empty string');
+      await expect(signInWithCustomToken(undefined as any)).rejects.toThrow('customToken must be a non-empty string');
+      await expect(signInWithCustomToken(123 as any)).rejects.toThrow('customToken must be a non-empty string');
+    });
+
+    it('should throw error when API key is not configured', async () => {
+      mockGetFirebaseApiKey.mockImplementation(() => {
+        throw new Error('Firebase API key not configured');
+      });
+
+      await expect(signInWithCustomToken('mock-token')).rejects.toThrow('Firebase API key not configured');
+    });
+
+    it('should handle API error response with JSON error message', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({
+          error: {
+            message: 'INVALID_CUSTOM_TOKEN',
+          },
+        }),
+      });
+
+      await expect(signInWithCustomToken('invalid-token')).rejects.toThrow('INVALID_CUSTOM_TOKEN');
+    });
+
+    it('should handle API error response with plain text', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+      });
+
+      await expect(signInWithCustomToken('invalid-token')).rejects.toThrow('401 - Unauthorized');
+    });
+
+    it('should handle network errors', async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+      await expect(signInWithCustomToken('mock-token')).rejects.toThrow('Network error');
+    });
+
+    it('should handle malformed JSON response', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new Error('Invalid JSON');
+        },
+      });
+
+      await expect(signInWithCustomToken('mock-token')).rejects.toThrow('Invalid JSON');
+    });
+
+    it('should handle expired custom token error', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({
+          error: {
+            message: 'TOKEN_EXPIRED',
+          },
+        }),
+      });
+
+      await expect(signInWithCustomToken('expired-token')).rejects.toThrow('TOKEN_EXPIRED');
+    });
+
+    it('should handle invalid custom token format error', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({
+          error: {
+            message: 'INVALID_CUSTOM_TOKEN: Invalid assertion format',
+          },
+        }),
+      });
+
+      await expect(signInWithCustomToken('malformed-token')).rejects.toThrow('Invalid assertion format');
+    });
+
+    it('should return all required fields in response', async () => {
+      const result = await signInWithCustomToken('mock-token');
+
+      expect(result).toHaveProperty('idToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('expiresIn');
+    });
+
+    it('should handle successful authentication with custom claims', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          idToken: 'mock-id-token-with-claims',
+          refreshToken: 'mock-refresh-token',
+          expiresIn: '3600',
+          isNewUser: true,
+        }),
+      });
+
+      const result = await signInWithCustomToken('custom-token-with-claims');
+
+      expect(result.isNewUser).toBe(true);
+      expect(result.idToken).toBe('mock-id-token-with-claims');
+    });
+
+    it('should use Firebase API key from config', async () => {
+      mockGetFirebaseApiKey.mockReturnValue('custom-api-key-123');
+
+      await signInWithCustomToken('mock-token');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=custom-api-key-123',
+        expect.any(Object)
+      );
     });
   });
 
