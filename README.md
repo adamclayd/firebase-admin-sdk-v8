@@ -514,8 +514,9 @@ For better query performance:
 
 | Feature | Supported | Notes |
 |---------|-----------|-------|
-| ID Token Verification | ✅ | Via firebase-auth-cloudflare-workers |
-| Custom Token Creation | ❌ | Not yet implemented |
+| ID Token Verification | ✅ | Supports v9 and v10 token formats |
+| Custom Token Creation | ✅ | createCustomToken() |
+| Custom Token Exchange | ✅ | signInWithCustomToken() |
 | User Management | ❌ | Not yet implemented |
 | Firestore CRUD | ✅ | Full support |
 | Firestore Queries | ✅ | where, orderBy, limit, cursors |
@@ -524,7 +525,7 @@ For better query performance:
 | **Realtime Listeners** | **❌** | **See explanation below** |
 | Field Values | ✅ | increment, arrayUnion, serverTimestamp, etc. |
 | Realtime Database | ❌ | Not planned |
-| Cloud Storage | ❌ | Not yet implemented |
+| Cloud Storage | ✅ | Upload, download, delete, signed URLs |
 | Cloud Messaging | ❌ | Not yet implemented |
 
 ## ⚠️ Realtime Listeners Not Supported
@@ -649,10 +650,12 @@ onSnapshot(doc(db, 'users', 'user123'), (snapshot) => {
 
 ## 🗺️ Roadmap
 
-- [ ] Custom token creation
+- [x] Custom token creation ✅ (v2.2.0)
+- [x] Custom token exchange ✅ (v2.2.0)
+- [x] Cloud Storage operations ✅ (v2.2.0)
 - [ ] User management (create, update, delete users)
 - [ ] Firestore transactions
-- [ ] Cloud Storage operations
 - [ ] More comprehensive error handling
 - [ ] Rate limiting helpers
 - [ ] Retry logic for failed operations
+- [ ] Storage unit tests (currently only e2e)

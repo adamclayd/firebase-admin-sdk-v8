@@ -4,12 +4,17 @@
 
 This library provides Firebase Admin SDK functionality for Cloudflare Workers and edge runtimes. It uses REST APIs and JWT token generation instead of the Node.js Admin SDK, making it compatible with environments that don't support Node.js.
 
-## Key Features
+## Key Features (v2.2.0)
 
 - ✅ **No Node.js Dependencies** - Pure Web APIs (crypto.subtle, fetch)
 - ✅ **JWT Token Generation** - Service account authentication
-- ✅ **ID Token Verification** - Verify Firebase ID tokens
-- ✅ **Firestore REST API** - CRUD operations via REST
+- ✅ **ID Token Verification** - Verify Firebase ID tokens (v9 & v10 formats)
+- ✅ **Custom Token Creation** - Create custom JWT tokens for users
+- ✅ **Custom Token Exchange** - Exchange custom tokens for ID tokens
+- ✅ **Firestore REST API** - Full CRUD operations via REST
+- ✅ **Field Transforms** - serverTimestamp, increment, arrayUnion, arrayRemove, deleteField
+- ✅ **Batch Operations** - Atomic multi-document writes
+- ✅ **Storage Operations** - Upload, download, delete, signed URLs
 - ✅ **OAuth Access Tokens** - Generate admin API access tokens
 - ✅ **Token Caching** - Automatic token refresh before expiry
 
@@ -19,11 +24,25 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 firebase-admin-sdk-v8/
 ├── src/
 │   ├── index.ts                 # Main exports
-│   ├── auth.ts                  # Auth operations (verify tokens)
+│   ├── config.ts                # SDK configuration
+│   ├── types.ts                 # TypeScript types
+│   ├── auth.ts                  # Auth operations (verify, custom tokens)
 │   ├── token-generation.ts      # JWT/OAuth token generation
-│   ├── service-account.ts       # Service account handling
-│   ├── firestore-rest.ts        # Firestore REST API wrapper
-│   └── types.ts                 # TypeScript types
+│   ├── x509.ts                  # X.509 certificate parsing
+│   ├── field-value.ts           # FieldValue sentinels
+│   ├── service-account.ts       # Service account (deprecated)
+│   ├── firestore-rest.ts        # Firestore compatibility layer
+│   ├── firestore/               # Modular Firestore implementation
+│   │   ├── index.ts             # Barrel export
+│   │   ├── converters.ts        # Data format conversion
+│   │   ├── query-builder.ts     # Query construction
+│   │   ├── transforms.ts        # Field transforms
+│   │   ├── operations.ts        # CRUD operations
+│   │   └── path-validation.ts   # Path validation
+│   └── storage/                 # Storage implementation
+│       ├── index.ts             # Barrel export
+│       ├── client.ts            # Storage operations
+│       └── signed-urls.ts       # V4 signed URL generation
 ├── agent/
 │   └── architecture.md          # This file
 └── package.json
@@ -204,6 +223,86 @@ export async function getUserFromToken(idToken: string) {
     photoURL: decodedToken.picture || null,
   };
 }
+
+/**
+ * Create a custom token for a user
+ */
+export async function createCustomToken(
+  uid: string,
+  customClaims?: Record<string, any>
+): Promise<string> {
+  const serviceAccount = getServiceAccount();
+  
+  // Validate UID
+  if (!uid || typeof uid !== 'string') {
+    throw new Error('uid must be a non-empty string');
+  }
+  
+  if (uid.length > 128) {
+    throw new Error('uid must be at most 128 characters');
+  }
+  
+  // Build JWT payload
+  const now = Math.floor(Date.now() / 1000);
+  const payload: Record<string, any> = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+    iat: now,
+    exp: now + 3600, // 1 hour
+    uid,
+  };
+  
+  // Add custom claims if provided
+  if (customClaims) {
+    payload.claims = customClaims;
+  }
+  
+  // Create JWT header
+  const header = { alg: 'RS256', typ: 'JWT' };
+  
+  // Encode and sign
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+  
+  const signature = await signWithPrivateKey(unsignedToken, serviceAccount.private_key);
+  
+  return `${unsignedToken}.${signature}`;
+}
+
+/**
+ * Exchange a custom token for an ID token and refresh token
+ */
+export async function signInWithCustomToken(
+  customToken: string
+): Promise<{ idToken: string; refreshToken: string; expiresIn: string }> {
+  if (!customToken || typeof customToken !== 'string') {
+    throw new Error('customToken must be a non-empty string');
+  }
+  
+  const apiKey = getFirebaseApiKey();
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to sign in with custom token: ${response.status} ${errorText}`);
+  }
+  
+  const result = await response.json();
+  
+  return {
+    idToken: result.idToken,
+    refreshToken: result.refreshToken,
+    expiresIn: result.expiresIn,
+  };
+}
 ```
 
 ### 4. Firestore REST API
@@ -337,6 +436,100 @@ function convertFromFirestoreFormat(fields: Record<string, any>): Record<string,
 }
 ```
 
+### 5. Firebase Storage
+
+```typescript
+// src/storage/client.ts
+import { getAdminAccessToken } from '../token-generation';
+import { getProjectId } from '../config';
+
+const STORAGE_API_BASE = 'https://storage.googleapis.com/storage/v1';
+const UPLOAD_API_BASE = 'https://storage.googleapis.com/upload/storage/v1';
+
+/**
+ * Upload a file to Firebase Storage
+ */
+export async function uploadFile(
+  path: string,
+  data: ArrayBuffer | Uint8Array | Blob,
+  options: UploadOptions = {}
+): Promise<FileMetadata> {
+  const token = await getAdminAccessToken();
+  const bucket = getDefaultBucket();
+  
+  const contentType = options.contentType || detectContentType(path);
+  const url = `${UPLOAD_API_BASE}/b/${encodeURIComponent(bucket)}/o?uploadType=media&name=${encodeURIComponent(path)}`;
+  
+  // Convert data to ArrayBuffer if needed
+  let body: ArrayBuffer;
+  if (data instanceof Blob) {
+    body = await data.arrayBuffer();
+  } else if (data instanceof Uint8Array) {
+    const buffer = new ArrayBuffer(data.byteLength);
+    new Uint8Array(buffer).set(data);
+    body = buffer;
+  } else {
+    body = data;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': contentType,
+      'Content-Length': body.byteLength.toString(),
+    },
+    body,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to upload file: ${await response.text()}`);
+  }
+  
+  return await response.json();
+}
+
+/**
+ * Download a file from Firebase Storage
+ */
+export async function downloadFile(path: string): Promise<ArrayBuffer> {
+  const token = await getAdminAccessToken();
+  const bucket = getDefaultBucket();
+  
+  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}?alt=media`;
+  
+  const response = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download file: ${await response.text()}`);
+  }
+  
+  return await response.arrayBuffer();
+}
+
+/**
+ * Generate a signed URL for temporary access
+ */
+export async function generateSignedUrl(
+  path: string,
+  options: SignedUrlOptions
+): Promise<string> {
+  const serviceAccount = getServiceAccount();
+  const bucket = getStorageBucket();
+  
+  // V4 signing process
+  const method = actionToMethod(options.action);
+  const expiration = getExpirationTimestamp(options.expires);
+  
+  // Build canonical request and sign with private key
+  const signature = await signData(stringToSign, serviceAccount.private_key);
+  
+  return `https://storage.googleapis.com${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signature}`;
+}
+```
+
 ## Usage Examples
 
 ### Verify ID Token
@@ -367,8 +560,47 @@ const tokenData = {
   expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
 };
 
-const docId = await addDocument('password-resets', tokenData);
-console.log('Created document:', docId);
+const docRef = await addDocument('password-resets', tokenData);
+console.log('Created document:', docRef.id);
+```
+
+### Create Custom Tokens
+
+```typescript
+import { createCustomToken, signInWithCustomToken } from 'firebase-admin-sdk-v8';
+
+// Server-side: Create custom token
+const customToken = await createCustomToken('user123', {
+  role: 'admin',
+  premium: true,
+});
+
+// Exchange for ID token
+const credentials = await signInWithCustomToken(customToken);
+console.log('ID Token:', credentials.idToken);
+```
+
+### Upload Files to Storage
+
+```typescript
+import { uploadFile, downloadFile, generateSignedUrl } from 'firebase-admin-sdk-v8';
+
+// Upload file
+const data = new TextEncoder().encode('Hello, Storage!');
+const metadata = await uploadFile('files/hello.txt', data, {
+  contentType: 'text/plain',
+  metadata: { userId: '123' },
+});
+
+// Download file
+const fileData = await downloadFile('files/hello.txt');
+const text = new TextDecoder().decode(fileData);
+
+// Generate signed URL (valid for 1 hour)
+const url = await generateSignedUrl('files/hello.txt', {
+  action: 'read',
+  expires: 3600,
+});
 ```
 
 ## Environment Variables
@@ -379,6 +611,12 @@ FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"..."
 
 # Firebase Project ID (for REST API calls)
 PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+
+# Firebase Web API Key (for custom token exchange)
+FIREBASE_API_KEY=AIza...
+
+# Firebase Storage Bucket (optional, defaults to {projectId}.appspot.com)
+FIREBASE_STORAGE_BUCKET=your-bucket.appspot.com
 ```
 
 ## Dependencies
@@ -398,18 +636,39 @@ PUBLIC_FIREBASE_PROJECT_ID=your-project-id
 | **Environment** | Node.js only | Cloudflare Workers, Edge |
 | **Auth** | Admin SDK methods | JWT + REST API |
 | **Firestore** | Native SDK | REST API |
-| **Token Verification** | Built-in | firebase-auth-cloudflare-workers |
-| **Dependencies** | Heavy (Node.js) | Lightweight (Web APIs) |
+| **Token Verification** | Built-in | Web Crypto API |
+| **Custom Tokens** | Built-in | Web Crypto API |
+| **Storage** | @google-cloud/storage | REST API |
+| **Dependencies** | Heavy (Node.js) | Zero (Web APIs only) |
 
 ## Benefits
 
 1. **Edge Compatible** - Runs in Cloudflare Workers, Deno, Bun
 2. **Lightweight** - No Node.js dependencies
-3. **Fast Cold Starts** - Minimal bundle size
+3. **Fast Cold Starts** - Minimal bundle size (~28KB)
 4. **Secure** - Uses Web Crypto API for signing
 5. **Cached Tokens** - Automatic token refresh
+6. **Full Storage Support** - Upload, download, signed URLs
+7. **Custom Authentication** - Create and exchange custom tokens
 
-## Related
+## Version History
 
-- [firebase-client-v8](../firebase-client-v8) - Client-side Firebase library
-- [agentbase.me](../agentbase.me) - Uses both libraries for auth
+### v2.2.0 (2026-02-11)
+- ✅ Added Firebase Storage support (upload, download, delete, signed URLs)
+- ✅ Added custom token creation (`createCustomToken`)
+- ✅ Added custom token exchange (`signInWithCustomToken`)
+- ✅ Added Firebase Web API key configuration
+- ✅ V4 signed URL generation with crypto.subtle
+- ✅ Support for Firebase v10 token formats
+
+### v2.0.x (2026-02-10)
+- ✅ Modular architecture refactoring (4 phases complete)
+- ✅ 98.02% test coverage achieved
+- ✅ Field transforms implementation
+- ✅ Subcollection query bug fixes
+- ✅ E2E testing infrastructure
+
+## Related Projects
+
+- [Firebase Admin Node SDK](https://github.com/firebase/firebase-admin-node) - Official Node.js SDK
+- [Firebase REST API](https://firebase.google.com/docs/firestore/use-rest-api) - Official REST API docs

@@ -135,10 +135,13 @@ const signature = await crypto.subtle.sign(
 | **Firestore Queries** | ✅ Full | ✅ Core features |
 | **Firestore Transactions** | ✅ Yes | ❌ Not yet |
 | **Firestore Batch Writes** | ✅ Yes | ✅ Yes |
-| **Auth Token Verification** | ✅ Yes | ✅ Yes |
-| **Custom Claims** | ✅ Yes | ✅ Yes (via REST) |
+| **Auth Token Verification** | ✅ Yes | ✅ Yes (v9 & v10) |
+| **Custom Token Creation** | ✅ Yes | ✅ Yes |
+| **Custom Token Exchange** | ✅ Yes | ✅ Yes |
+| **Custom Claims** | ✅ Yes | ✅ Yes |
 | **User Management** | ✅ Full | ❌ Not yet |
-| **Cloud Storage** | ✅ Yes | ❌ Not yet |
+| **Cloud Storage** | ✅ Yes | ✅ Yes |
+| **Signed URLs** | ✅ Yes | ✅ Yes (V4 signing) |
 | **Cloud Messaging** | ✅ Yes | ❌ Not yet |
 | **Realtime Database** | ✅ Yes | ❌ Not yet |
 | **Remote Config** | ✅ Yes | ❌ Not yet |
@@ -302,9 +305,9 @@ src/
 
 1. **Add More Features**
    - Firestore transactions
-   - Cloud Storage operations
-   - Cloud Messaging
    - User management APIs
+   - Cloud Messaging
+   - Storage unit tests
 
 2. **Improve Performance**
    - Better caching strategies
@@ -325,6 +328,12 @@ src/
 
 Both SDKs serve different purposes:
 - **firebase-admin-node**: Full-featured, Node.js-specific, production-ready
-- **firebase-admin-sdk-v8**: Lightweight, edge-compatible, core features only
+- **firebase-admin-sdk-v8**: Lightweight, edge-compatible, production-ready for core features
 
 Our SDK fills a gap for edge runtimes where the official SDK cannot run due to Node.js dependencies and V8 isolate constraints.
+
+### Recent Additions (v2.2.0)
+- ✅ Custom token creation and exchange
+- ✅ Firebase Storage (upload, download, delete, signed URLs)
+- ✅ V4 signed URL generation
+- ✅ Support for Firebase v10 token formats
