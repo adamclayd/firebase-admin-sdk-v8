@@ -281,6 +281,13 @@ describe('Storage E2E Tests', () => {
 
       // Fetch file using signed URL (no auth needed)
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Signed URL error:', response.status, errorText);
+        console.log('Generated URL:', url);
+      }
+      
       expect(response.ok).toBe(true);
 
       const downloadedText = await response.text();

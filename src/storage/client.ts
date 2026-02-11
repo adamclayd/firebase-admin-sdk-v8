@@ -59,8 +59,18 @@ export interface ListFilesResult {
 
 /**
  * Get the default storage bucket name
+ *
+ * Checks FIREBASE_STORAGE_BUCKET environment variable first,
+ * then falls back to {projectId}.appspot.com
  */
 function getDefaultBucket(): string {
+  // Check for custom bucket name in environment
+  const customBucket = process.env.FIREBASE_STORAGE_BUCKET;
+  if (customBucket) {
+    return customBucket;
+  }
+  
+  // Fall back to default appspot bucket
   const projectId = getProjectId();
   return `${projectId}.appspot.com`;
 }

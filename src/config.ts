@@ -11,6 +11,7 @@ import type { ServiceAccount } from './types';
 interface SDKConfig {
   serviceAccount?: ServiceAccount | string;
   projectId?: string;
+  apiKey?: string;
 }
 
 /**
@@ -141,5 +142,32 @@ export function getProjectId(): string {
   throw new Error(
     'Firebase project ID not configured. ' +
     'Either call initializeApp({ projectId: ... }) or set FIREBASE_PROJECT_ID environment variable.'
+  );
+}
+
+/**
+ * Get Firebase Web API key from config or environment
+ * Priority: 1) globalConfig, 2) process.env
+ *
+ * Required for Identity Toolkit API calls (signInWithCustomToken)
+ */
+export function getFirebaseApiKey(): string {
+  // Try config first
+  if (globalConfig.apiKey) {
+    return globalConfig.apiKey;
+  }
+
+  // Fall back to process.env
+  if (typeof process !== 'undefined' && process.env) {
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.PUBLIC_FIREBASE_API_KEY;
+    if (apiKey) {
+      return apiKey;
+    }
+  }
+  
+  throw new Error(
+    'Firebase API key not configured. ' +
+    'Either call initializeApp({ apiKey: ... }) or set FIREBASE_API_KEY environment variable. ' +
+    'Find your API key in Firebase Console > Project Settings > Web API Key.'
   );
 }

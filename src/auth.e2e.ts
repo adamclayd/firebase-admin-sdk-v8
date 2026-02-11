@@ -10,7 +10,7 @@
  */
 
 import { initializeApp } from './config';
-import { verifyIdToken, getUserFromToken } from './auth';
+import { verifyIdToken, getUserFromToken, createCustomToken } from './auth';
 import { getAdminAccessToken } from './token-generation';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -169,6 +169,78 @@ describe('Auth E2E Tests', () => {
       
       // Will fail at key lookup (kid 'test' doesn't exist)
       await expect(verifyIdToken(token)).rejects.toThrow('Public key not found');
+    });
+  });
+
+  describe('Custom Token Creation', () => {
+    it('should create a custom token with valid structure', async () => {
+      const uid = 'test-user-123';
+      const customClaims = {
+        role: 'admin',
+        premium: true,
+      };
+      
+      const customToken = await createCustomToken(uid, customClaims);
+      
+      expect(customToken).toBeDefined();
+      expect(typeof customToken).toBe('string');
+      expect(customToken.split('.').length).toBe(3); // header.payload.signature
+    });
+
+    it('should create token with correct JWT structure', async () => {
+      const uid = 'test-user-456';
+      const token = await createCustomToken(uid);
+      
+      // Decode and verify structure (without calling Firebase)
+      const [headerB64, payloadB64] = token.split('.');
+      const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      // Verify header
+      expect(header.alg).toBe('RS256');
+      expect(header.typ).toBe('JWT');
+      
+      // Verify payload
+      expect(payload.uid).toBe(uid);
+      expect(payload.aud).toContain('identitytoolkit');
+      expect(payload.iss).toContain('iam.gserviceaccount.com');
+      expect(payload.sub).toContain('iam.gserviceaccount.com');
+      expect(payload.iat).toBeDefined();
+      expect(payload.exp).toBeDefined();
+      expect(payload.exp - payload.iat).toBe(3600); // 1 hour
+    });
+
+    it('should include custom claims in token', async () => {
+      const uid = 'test-user-789';
+      const customClaims = {
+        role: 'moderator',
+        permissions: ['read', 'write'],
+        level: 5,
+      };
+      
+      const token = await createCustomToken(uid, customClaims);
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.uid).toBe(uid);
+      expect(payload.claims).toEqual(customClaims);
+    });
+
+    it('should create token without custom claims', async () => {
+      const uid = 'test-user-no-claims';
+      const token = await createCustomToken(uid);
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.uid).toBe(uid);
+      expect(payload.claims).toBeUndefined();
+    });
+
+    it('should throw error for invalid UID', async () => {
+      await expect(createCustomToken('')).rejects.toThrow('uid must be a non-empty string');
+      await expect(createCustomToken('a'.repeat(129))).rejects.toThrow('uid must be at most 128 characters');
     });
   });
 });

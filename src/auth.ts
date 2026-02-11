@@ -5,7 +5,25 @@
 
 import type { DecodedIdToken, UserInfo } from './types';
 import { getProjectId } from './service-account';
+import { getServiceAccount, getFirebaseApiKey } from './config';
 import { importPublicKeyFromX509 } from './x509';
+
+/**
+ * Custom claims for custom tokens
+ */
+export interface CustomClaims {
+  [key: string]: any;
+}
+
+/**
+ * Response from signInWithCustomToken
+ */
+export interface CustomTokenSignInResponse {
+  idToken: string;
+  refreshToken: string;
+  expiresIn: string;
+  localId: string;
+}
 
 /**
  * JWT header structure
@@ -254,6 +272,190 @@ export async function getUserFromToken(idToken: string): Promise<UserInfo> {
     emailVerified: decodedToken.email_verified || false,
     displayName: decodedToken.name || null,
     photoURL: decodedToken.picture || null,
+  };
+}
+
+/**
+ * Base64 URL encode
+ */
+function base64UrlEncode(str: string): string {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/**
+ * Helper to sign data with private key
+ */
+async function signWithPrivateKey(data: string, privateKey: string): Promise<string> {
+  // Import the private key
+  const pemHeader = '-----BEGIN PRIVATE KEY-----';
+  const pemFooter = '-----END PRIVATE KEY-----';
+  const pemContents = privateKey
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\s/g, '');
+  
+  const binaryString = atob(pemContents);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    bytes,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign']
+  );
+  
+  const encoder = new TextEncoder();
+  const dataBytes = encoder.encode(data);
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    dataBytes
+  );
+  
+  return base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+/**
+ * Create a custom token for a user
+ *
+ * @param uid - User ID
+ * @param customClaims - Optional custom claims to include in token
+ * @returns Custom JWT token
+ *
+ * @example
+ * ```typescript
+ * // Create token with custom claims
+ * const token = await createCustomToken('user123', {
+ *   role: 'admin',
+ *   premium: true,
+ * });
+ *
+ * // Use token on client to sign in
+ * await signInWithCustomToken(auth, token);
+ * ```
+ */
+export async function createCustomToken(
+  uid: string,
+  customClaims?: CustomClaims
+): Promise<string> {
+  const serviceAccount = getServiceAccount();
+  
+  // Validate UID
+  if (!uid || typeof uid !== 'string') {
+    throw new Error('uid must be a non-empty string');
+  }
+  
+  if (uid.length > 128) {
+    throw new Error('uid must be at most 128 characters');
+  }
+  
+  // Build JWT payload
+  const now = Math.floor(Date.now() / 1000);
+  const payload: Record<string, any> = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+    iat: now,
+    exp: now + 3600, // 1 hour
+    uid,
+  };
+  
+  // Add custom claims if provided
+  if (customClaims) {
+    payload.claims = customClaims;
+  }
+  
+  // Create JWT header
+  const header = {
+    alg: 'RS256',
+    typ: 'JWT',
+  };
+  
+  // Encode header and payload
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+  
+  // Sign with private key
+  const signature = await signWithPrivateKey(unsignedToken, serviceAccount.private_key);
+  
+  return `${unsignedToken}.${signature}`;
+}
+
+/**
+ * Exchange a custom token for an ID token and refresh token
+ *
+ * @param customToken - Custom JWT token created with createCustomToken
+ * @returns User credentials (idToken, refreshToken, expiresIn, localId)
+ *
+ * @example
+ * ```typescript
+ * // Server-side: Create custom token
+ * const customToken = await createCustomToken('user123', { role: 'admin' });
+ *
+ * // Exchange for ID token
+ * const credentials = await signInWithCustomToken(customToken);
+ *
+ * // Use ID token for authenticated requests
+ * const user = await verifyIdToken(credentials.idToken);
+ * ```
+ */
+export async function signInWithCustomToken(
+  customToken: string
+): Promise<CustomTokenSignInResponse> {
+  if (!customToken || typeof customToken !== 'string') {
+    throw new Error('customToken must be a non-empty string');
+  }
+  
+  // Get Firebase Web API key
+  const apiKey = getFirebaseApiKey();
+  
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      token: customToken,
+      returnSecureToken: true,
+    }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `Failed to sign in with custom token: ${response.status}`;
+    
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error && errorJson.error.message) {
+        errorMessage += ` - ${errorJson.error.message}`;
+      }
+    } catch {
+      errorMessage += ` - ${errorText}`;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  const result = await response.json();
+  
+  return {
+    idToken: result.idToken,
+    refreshToken: result.refreshToken,
+    expiresIn: result.expiresIn,
+    localId: result.localId,
   };
 }
 

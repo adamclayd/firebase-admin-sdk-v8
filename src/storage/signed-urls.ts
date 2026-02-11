@@ -6,6 +6,18 @@
 import { getServiceAccount, getProjectId } from '../config';
 
 /**
+ * Get the storage bucket name (same logic as client.ts)
+ */
+function getStorageBucket(): string {
+  const customBucket = process.env.FIREBASE_STORAGE_BUCKET;
+  if (customBucket) {
+    return customBucket;
+  }
+  const projectId = getProjectId();
+  return `${projectId}.appspot.com`;
+}
+
+/**
  * Options for generating signed URLs
  */
 export interface SignedUrlOptions {
@@ -133,14 +145,19 @@ export async function generateSignedUrl(
   options: SignedUrlOptions
 ): Promise<string> {
   const serviceAccount = getServiceAccount();
-  const projectId = getProjectId();
-  const bucket = `${projectId}.appspot.com`;
+  const bucket = getStorageBucket();
   
   // V4 signing process
   const method = actionToMethod(options.action);
   const expiration = getExpirationTimestamp(options.expires);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const datestamp = new Date(timestamp * 1000).toISOString().split('T')[0].replace(/-/g, '');
+  const now = new Date();
+  const timestamp = Math.floor(now.getTime() / 1000);
+  
+  // Format date and time for V4 signing (YYYYMMDDTHHMMSSZ)
+  const isoString = now.toISOString();
+  const datestamp = isoString.split('T')[0].replace(/-/g, ''); // YYYYMMDD
+  const timeString = isoString.split('T')[1].replace(/[:.]/g, '').substring(0, 6); // HHMMSS
+  const dateTimeStamp = `${datestamp}T${timeString}Z`; // YYYYMMDDTHHMMSSZ
   
   // Credential scope
   const credentialScope = `${datestamp}/auto/storage/goog4_request`;
@@ -154,7 +171,7 @@ export async function generateSignedUrl(
   const queryParams: Record<string, string> = {
     'X-Goog-Algorithm': 'GOOG4-RSA-SHA256',
     'X-Goog-Credential': credential,
-    'X-Goog-Date': `${datestamp}T000000Z`,
+    'X-Goog-Date': dateTimeStamp,
     'X-Goog-Expires': (expiration - timestamp).toString(),
     'X-Goog-SignedHeaders': signedHeaders,
   };
@@ -177,7 +194,9 @@ export async function generateSignedUrl(
     .join('&');
   
   // Canonical request
-  const canonicalUri = `/${bucket}/${path}`;
+  // Note: The path must be URL-encoded for the canonical request
+  const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  const canonicalUri = `/${bucket}/${encodedPath}`;
   const canonicalRequest = [
     method,
     canonicalUri,
@@ -191,7 +210,7 @@ export async function generateSignedUrl(
   const canonicalRequestHash = stringToHex(canonicalRequest);
   const stringToSign = [
     'GOOG4-RSA-SHA256',
-    `${datestamp}T000000Z`,
+    dateTimeStamp,
     credentialScope,
     canonicalRequestHash,
   ].join('\n');

@@ -3,15 +3,18 @@
  * Tests JWT verification with mocked crypto and fetch
  */
 
-import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache } from './auth';
+import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache, createCustomToken } from './auth';
 import * as serviceAccount from './service-account';
+import * as config from './config';
 import * as x509 from './x509';
 
 // Mock dependencies
 jest.mock('./service-account');
+jest.mock('./config');
 jest.mock('./x509');
 
 const mockGetProjectId = serviceAccount.getProjectId as jest.MockedFunction<typeof serviceAccount.getProjectId>;
+const mockGetServiceAccount = config.getServiceAccount as jest.MockedFunction<typeof config.getServiceAccount>;
 const mockImportPublicKeyFromX509 = x509.importPublicKeyFromX509 as jest.MockedFunction<typeof x509.importPublicKeyFromX509>;
 
 describe('Authentication', () => {
@@ -363,6 +366,195 @@ describe('Authentication', () => {
       const result = await verifyIdToken(token);
 
       expect(result.uid).toBe('test-user-id');
+    });
+  });
+
+  describe('createCustomToken', () => {
+    const mockServiceAccount = {
+      type: 'service_account',
+      project_id: 'test-project',
+      private_key_id: 'key-id',
+      private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----',
+      client_email: 'test@test-project.iam.gserviceaccount.com',
+      client_id: '123456789',
+      auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: 'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com',
+    };
+
+    beforeEach(() => {
+      mockGetServiceAccount.mockReturnValue(mockServiceAccount);
+      
+      // Mock crypto.subtle for signing
+      global.crypto = {
+        subtle: {
+          importKey: jest.fn().mockResolvedValue({} as CryptoKey),
+          sign: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3, 4]).buffer),
+          verify: jest.fn().mockResolvedValue(true),
+        },
+      } as any;
+    });
+
+    it('should create a custom token with valid UID', async () => {
+      const uid = 'test-user-123';
+      const token = await createCustomToken(uid);
+
+      expect(token).toBeDefined();
+      expect(typeof token).toBe('string');
+      expect(token.split('.').length).toBe(3); // header.payload.signature
+    });
+
+    it('should create token with custom claims', async () => {
+      const uid = 'test-user-123';
+      const customClaims = {
+        role: 'admin',
+        premium: true,
+        level: 5,
+      };
+
+      const token = await createCustomToken(uid, customClaims);
+      
+      // Decode payload to verify claims
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.uid).toBe(uid);
+      expect(payload.claims).toEqual(customClaims);
+    });
+
+    it('should include correct JWT header', async () => {
+      const token = await createCustomToken('test-user');
+      
+      const [headerB64] = token.split('.');
+      const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(header.alg).toBe('RS256');
+      expect(header.typ).toBe('JWT');
+    });
+
+    it('should include correct JWT claims', async () => {
+      const uid = 'test-user-123';
+      const token = await createCustomToken(uid);
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.iss).toBe(mockServiceAccount.client_email);
+      expect(payload.sub).toBe(mockServiceAccount.client_email);
+      expect(payload.aud).toBe('https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit');
+      expect(payload.uid).toBe(uid);
+      expect(payload.iat).toBeDefined();
+      expect(payload.exp).toBeDefined();
+    });
+
+    it('should set token expiration to 1 hour', async () => {
+      const token = await createCustomToken('test-user');
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      const expiresIn = payload.exp - payload.iat;
+      expect(expiresIn).toBe(3600); // 1 hour in seconds
+    });
+
+    it('should throw error for empty UID', async () => {
+      await expect(createCustomToken('')).rejects.toThrow('uid must be a non-empty string');
+    });
+
+    it('should throw error for non-string UID', async () => {
+      await expect(createCustomToken(null as any)).rejects.toThrow('uid must be a non-empty string');
+      await expect(createCustomToken(undefined as any)).rejects.toThrow('uid must be a non-empty string');
+      await expect(createCustomToken(123 as any)).rejects.toThrow('uid must be a non-empty string');
+    });
+
+    it('should throw error for UID longer than 128 characters', async () => {
+      const longUid = 'a'.repeat(129);
+      await expect(createCustomToken(longUid)).rejects.toThrow('uid must be at most 128 characters');
+    });
+
+    it('should accept UID with exactly 128 characters', async () => {
+      const maxUid = 'a'.repeat(128);
+      const token = await createCustomToken(maxUid);
+      
+      expect(token).toBeDefined();
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      expect(payload.uid).toBe(maxUid);
+    });
+
+    it('should use base64url encoding (no padding)', async () => {
+      const token = await createCustomToken('test-user');
+      const parts = token.split('.');
+      
+      // Base64url should not contain +, /, or =
+      parts.forEach(part => {
+        expect(part).not.toContain('+');
+        expect(part).not.toContain('/');
+        expect(part).not.toContain('=');
+      });
+    });
+
+    it('should call crypto.subtle.importKey with correct parameters', async () => {
+      await createCustomToken('test-user');
+      
+      expect(global.crypto.subtle.importKey).toHaveBeenCalledWith(
+        'pkcs8',
+        expect.any(Uint8Array),
+        {
+          name: 'RSASSA-PKCS1-v1_5',
+          hash: 'SHA-256',
+        },
+        false,
+        ['sign']
+      );
+    });
+
+    it('should call crypto.subtle.sign with correct parameters', async () => {
+      await createCustomToken('test-user');
+      
+      expect(global.crypto.subtle.sign).toHaveBeenCalledWith(
+        'RSASSA-PKCS1-v1_5',
+        expect.anything(),
+        expect.any(Uint8Array)
+      );
+    });
+
+    it('should not include claims field when no custom claims provided', async () => {
+      const token = await createCustomToken('test-user');
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.claims).toBeUndefined();
+    });
+
+    it('should handle empty custom claims object', async () => {
+      const token = await createCustomToken('test-user', {});
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.claims).toEqual({});
+    });
+
+    it('should handle complex custom claims', async () => {
+      const customClaims = {
+        role: 'admin',
+        permissions: ['read', 'write', 'delete'],
+        metadata: {
+          department: 'engineering',
+          level: 5,
+        },
+        active: true,
+      };
+
+      const token = await createCustomToken('test-user', customClaims);
+      
+      const [, payloadB64] = token.split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      
+      expect(payload.claims).toEqual(customClaims);
     });
   });
 
