@@ -18,8 +18,30 @@ import {
 
 const TEST_COLLECTION = 'e2e_iteration_test';
 
+/**
+ * Helper to completely clean up a collection
+ */
+async function cleanupCollection(collectionPath: string): Promise<void> {
+  try {
+    let hasMore = true;
+    while (hasMore) {
+      const docs = await listDocuments(collectionPath, { limit: 100 });
+      if (docs.length === 0) {
+        hasMore = false;
+      } else {
+        // Delete in parallel for speed
+        await Promise.all(
+          docs.map(doc => deleteDocument(collectionPath, doc.id))
+        );
+      }
+    }
+  } catch (error) {
+    // Ignore errors during cleanup
+  }
+}
+
 describe('Firestore Iteration E2E', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     // Load service account from filesystem
     const serviceAccountPath = path.join(__dirname, '../../service-account.json');
     
@@ -37,30 +59,24 @@ describe('Firestore Iteration E2E', () => {
       serviceAccount,
       projectId: 'prmichaelsen-firebase-e2e',
     });
+
+    // Clean up any leftover documents from previous runs
+    await cleanupCollection(TEST_COLLECTION);
   });
 
   beforeEach(async () => {
     // Clean up test documents before each test
-    try {
-      const docs = await listDocuments(TEST_COLLECTION);
-      for (const doc of docs) {
-        await deleteDocument(TEST_COLLECTION, doc.id);
-      }
-    } catch (error) {
-      // Ignore errors during cleanup
-    }
+    await cleanupCollection(TEST_COLLECTION);
   });
 
   afterEach(async () => {
     // Clean up test documents after each test
-    try {
-      const docs = await listDocuments(TEST_COLLECTION);
-      for (const doc of docs) {
-        await deleteDocument(TEST_COLLECTION, doc.id);
-      }
-    } catch (error) {
-      // Ignore errors during cleanup
-    }
+    await cleanupCollection(TEST_COLLECTION);
+  });
+
+  afterAll(async () => {
+    // Final cleanup
+    await cleanupCollection(TEST_COLLECTION);
   });
 
   describe('listDocuments', () => {
