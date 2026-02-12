@@ -19,6 +19,9 @@ export {
   deleteDocument,
   queryDocuments,
   batchWrite,
+  listDocuments,
+  iterateCollection,
+  countDocuments,
 } from './firestore-rest';
 
 // Storage exports

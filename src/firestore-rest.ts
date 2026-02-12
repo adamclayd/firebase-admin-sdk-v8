@@ -33,3 +33,10 @@ export {
   queryDocuments,
   batchWrite,
 } from './firestore/operations';
+
+// Re-export collection iteration functions
+export {
+  listDocuments,
+  iterateCollection,
+  countDocuments,
+} from './firestore/iteration';

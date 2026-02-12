@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Collection iteration functions: `listDocuments()`, `iterateCollection()`, and `countDocuments()`
+- Automatic pagination support for large collections
+- Support for iterating with filters and ordering
+
 ### Changed
 - **BREAKING**: `fromFirestoreValue()` now throws an error for unknown Firestore value types instead of returning `null`
 - Removed debug console.log statements from production code in `auth.ts`

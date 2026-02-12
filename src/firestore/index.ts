@@ -33,3 +33,10 @@ export {
   queryDocuments,
   batchWrite,
 } from './operations';
+
+// Collection Iteration
+export {
+  listDocuments,
+  iterateCollection,
+  countDocuments,
+} from './iteration';
