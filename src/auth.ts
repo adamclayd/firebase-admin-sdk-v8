@@ -67,7 +67,6 @@ async function fetchPublicKeys(issuer?: string): Promise<Record<string, string>>
     return publicKeysCache;
   }
 
-  console.log(`[fetchPublicKeys] Fetching from: ${endpoint}`);
   const response = await fetch(endpoint);
 
   if (!response.ok) {
@@ -78,8 +77,6 @@ async function fetchPublicKeys(issuer?: string): Promise<Record<string, string>>
   
   // Cache for 1 hour (keys rotate every 24 hours)
   publicKeysCacheExpiry = Date.now() + 3600000;
-  
-  console.log(`[fetchPublicKeys] Fetched ${Object.keys(publicKeysCache || {}).length} keys`);
   
   return publicKeysCache!;
 }
@@ -213,7 +210,6 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
 
     // If key not found, it might have rotated - clear cache and retry once
     if (!publicKeyPem) {
-      console.log(`[verifyIdToken] Key ${header.kid} not found in cache, refreshing keys...`);
       publicKeysCache = null;
       publicKeysCacheExpiry = 0;
       

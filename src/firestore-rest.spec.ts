@@ -234,9 +234,8 @@ describe('Firestore REST API Integration', () => {
         });
       });
 
-      it('should return null for unknown value types', () => {
-        const result = fromFirestoreValue({} as any);
-        expect(result).toBeNull();
+      it('should throw error for unknown value types', () => {
+        expect(() => fromFirestoreValue({} as any)).toThrow('Unknown Firestore value type');
       });
     });
 

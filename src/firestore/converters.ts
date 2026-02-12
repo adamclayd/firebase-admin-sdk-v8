@@ -120,7 +120,7 @@ export function fromFirestoreValue(value: FirestoreValue): any {
     return convertFromFirestoreFormat(value.mapValue.fields || {});
   }
   
-  return null;
+  throw new Error(`Unknown Firestore value type: ${JSON.stringify(value)}`);
 }
 
 /**
