@@ -39,11 +39,12 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
     mockGetProjectId.mockReturnValue('test-project');
     delete process.env.FIREBASE_STORAGE_BUCKET;
     
-    // Mock crypto.subtle for signing
+    // Mock crypto.subtle for signing and hashing
     global.crypto = {
       subtle: {
         importKey: jest.fn().mockResolvedValue('mock-key'),
         sign: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer),
+        digest: jest.fn().mockResolvedValue(new Uint8Array(32).buffer), // SHA-256 produces 32 bytes
       },
     } as any;
   });
@@ -291,8 +292,15 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
 
     it('should generate different signatures for different actions', async () => {
       // The signature is based on the canonical request which includes the HTTP method
-      // Since we're mocking crypto.subtle.sign to return the same value, we verify
-      // that sign was called twice with different data
+      // We need to mock digest to return different hashes for different inputs
+      let digestCallCount = 0;
+      (crypto.subtle.digest as jest.Mock).mockImplementation(async (_alg, data) => {
+        // Return different hash for each call to ensure different string-to-sign
+        const hash = new Uint8Array(32);
+        hash[0] = digestCallCount++; // Make each hash unique
+        return hash.buffer;
+      });
+
       const signCalls: any[] = [];
       (crypto.subtle.sign as jest.Mock).mockImplementation(async (_alg, _key, data) => {
         signCalls.push(new Uint8Array(data));
@@ -309,7 +317,8 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
         expires: 3600,
       });
 
-      // Verify that sign was called twice with different data (different HTTP methods)
+      // Verify that sign was called twice with different string-to-sign
+      // (because digest returns different hashes, the canonical request hashes differ)
       expect(signCalls).toHaveLength(2);
       expect(signCalls[0]).not.toEqual(signCalls[1]);
     });
