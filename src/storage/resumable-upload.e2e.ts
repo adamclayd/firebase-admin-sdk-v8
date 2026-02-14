@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { initializeApp } from '../config';
 import { uploadFileResumable } from './resumable-upload';
-import { deleteFile, getFileMetadata } from './client';
+import { deleteFile, getFileMetadata, downloadFile } from './client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -241,6 +241,106 @@ describe('Resumable Upload E2E Tests', () => {
       
       // Verify final progress is complete
       expect(progressUpdates[progressUpdates.length - 1]).toBe(imageData.length);
+    }, 30000);
+  });
+
+  describe('Streaming Features Validation', () => {
+    it('should stream large file without loading into memory', async () => {
+      const filePath = trackFile(`${TEST_PREFIX}stream-large-${Date.now()}.bin`);
+      
+      // Create a 1MB file as stream (larger than typical chunk)
+      const fileSize = 1024 * 1024; // 1MB
+      const chunkSize = 262144; // 256KB - GCS minimum
+      const stream = new ReadableStream({
+        start(controller) {
+          // Emit in exact chunk sizes to avoid boundary issues
+          for (let i = 0; i < fileSize; i += chunkSize) {
+            const size = Math.min(chunkSize, fileSize - i);
+            controller.enqueue(new Uint8Array(size));
+          }
+          controller.close();
+        },
+      });
+
+      const metadata = await uploadFileResumable(
+        filePath,
+        stream,
+        'application/octet-stream',
+        { totalSize: fileSize, chunkSize }
+      );
+
+      expect(metadata.name).toContain(TEST_PREFIX);
+      expect(parseInt(metadata.size)).toBe(fileSize);
+    }, 30000);
+
+    it('should track progress correctly for streamed uploads', async () => {
+      const filePath = trackFile(`${TEST_PREFIX}stream-progress-${Date.now()}.bin`);
+      const fileSize = 600 * 1024; // 600KB
+      
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(fileSize));
+          controller.close();
+        },
+      });
+
+      const progressUpdates: Array<{ uploaded: number; total: number }> = [];
+      const metadata = await uploadFileResumable(
+        filePath,
+        stream,
+        'application/octet-stream',
+        {
+          totalSize: fileSize,
+          onProgress: (uploaded, total) => {
+            progressUpdates.push({ uploaded, total });
+          },
+        }
+      );
+
+      expect(metadata.name).toContain(TEST_PREFIX);
+      expect(progressUpdates.length).toBeGreaterThan(0);
+      
+      // Verify progress increases monotonically
+      for (let i = 1; i < progressUpdates.length; i++) {
+        expect(progressUpdates[i].uploaded).toBeGreaterThanOrEqual(
+          progressUpdates[i - 1].uploaded
+        );
+      }
+      
+      // Verify final progress is 100%
+      const final = progressUpdates[progressUpdates.length - 1];
+      expect(final.uploaded).toBe(final.total);
+      expect(final.total).toBe(fileSize);
+    }, 30000);
+
+    it('should handle stream with multiple small chunks', async () => {
+      const filePath = trackFile(`${TEST_PREFIX}stream-multi-${Date.now()}.txt`);
+      const pieces = ['Hello', ' ', 'from', ' ', 'streaming', '!'];
+      const totalSize = pieces.join('').length;
+      
+      const stream = new ReadableStream({
+        start(controller) {
+          for (const piece of pieces) {
+            controller.enqueue(new TextEncoder().encode(piece));
+          }
+          controller.close();
+        },
+      });
+
+      const metadata = await uploadFileResumable(
+        filePath,
+        stream,
+        'text/plain',
+        { totalSize }
+      );
+
+      expect(metadata.name).toContain(TEST_PREFIX);
+      expect(parseInt(metadata.size)).toBe(totalSize);
+      
+      // Verify we can download and read it back
+      const downloaded = await downloadFile(filePath);
+      const text = new TextDecoder().decode(downloaded);
+      expect(text).toBe('Hello from streaming!');
     }, 30000);
   });
 
