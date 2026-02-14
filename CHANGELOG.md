@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-02-14
+
+### Added
+- Comprehensive unit tests for Storage module (63 new tests)
+- Unit tests for `storage/client.ts` (31 tests, 88.11% coverage)
+- Unit tests for `storage/signed-urls.ts` (32 tests, 100% coverage)
+- Agent Context Protocol (ACP) initialization documentation
+
+### Changed
+- Improved overall test coverage from 76.15% to 96.02% (+19.87%)
+- Storage module coverage improved from 0% to 91.71%
+- Total test count increased from 339 to 402 tests
+
+### Fixed
+- Storage module now has proper unit test coverage (previously only e2e tests)
+
+## [2.2.2] - 2026-02-13
+
 ### Added
 - Collection iteration functions: `listDocuments()`, `iterateCollection()`, and `countDocuments()`
 - Automatic pagination support for large collections
