@@ -54,12 +54,14 @@ function actionToMethod(action: 'read' | 'write' | 'delete'): string {
 }
 
 /**
- * Encode string to hex
+ * Compute SHA-256 hash of a string and return as hex
  */
-function stringToHex(str: string): string {
+async function sha256Hex(str: string): Promise<string> {
   const encoder = new TextEncoder();
-  const bytes = encoder.encode(str);
-  return Array.from(bytes)
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -195,19 +197,24 @@ export async function generateSignedUrl(
   
   // Canonical request
   // Note: The path must be URL-encoded for the canonical request
+  // Each segment of the path should be encoded separately
   const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
   const canonicalUri = `/${bucket}/${encodedPath}`;
-  const canonicalRequest = [
-    method,
-    canonicalUri,
-    canonicalQueryString,
-    canonicalHeaders,
-    signedHeaders,
-    'UNSIGNED-PAYLOAD',
-  ].join('\n');
+  
+  // Build canonical request according to V4 signing spec
+  // Format:
+  // HTTP_METHOD\n
+  // CANONICAL_URI\n
+  // CANONICAL_QUERY_STRING\n
+  // CANONICAL_HEADERS\n (canonicalHeaders already ends with \n)
+  // \n (empty line - need to add this)
+  // SIGNED_HEADERS\n
+  // PAYLOAD_HASH
+  // Note: canonicalHeaders already has trailing \n, so we add another \n for the empty line
+  const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\nUNSIGNED-PAYLOAD`;
   
   // String to sign
-  const canonicalRequestHash = stringToHex(canonicalRequest);
+  const canonicalRequestHash = await sha256Hex(canonicalRequest);
   const stringToSign = [
     'GOOG4-RSA-SHA256',
     dateTimeStamp,

@@ -4,15 +4,15 @@
 
 project:
   name: firebase-admin-sdk-v8
-  version: 2.2.0
+  version: 2.3.0
   total_source_files: 20
   total_tests: 277
   total_test_suites: 10
-  total_e2e_tests: 43
-  e2e_tests_passing: 43
+  total_e2e_tests: 105
+  e2e_tests_passing: 105
   coverage_current: 98.02
   coverage_target: 80
-  last_updated: 2026-02-11
+  last_updated: 2026-02-14
   coverage_by_metric:
     statements: 98.02
     branches: 93.05
@@ -614,6 +614,39 @@ achievements:
       
       Audit Report: agent/security/audit_001.md
       Next Audit: 2026-08-11 (6 months)
+
+  - name: Signed URL Bug Fix
+    date: 2026-02-14
+    description: |
+      Fixed signed URL generation for .firebasestorage.app buckets
+      
+      Problem:
+      - Signed URLs were failing with SignatureDoesNotMatch error
+      - Issue occurred after updating default bucket format from .appspot.com to .firebasestorage.app
+      - All 3 signed URL e2e tests were failing
+      
+      Root Cause:
+      - The stringToHex() function was only hex-encoding the canonical request
+      - V4 signing spec requires SHA-256 hash of canonical request, not just hex encoding
+      - This caused signature mismatch with Google Cloud Storage
+      
+      Solution:
+      - Renamed stringToHex() to sha256Hex()
+      - Changed implementation to compute SHA-256 hash using crypto.subtle.digest()
+      - Updated function call to use async sha256Hex()
+      
+      Files Modified:
+      - src/storage/signed-urls.ts: Fixed hash function (line 56-66)
+      
+      Test Results:
+      - ✅ All 3 signed URL e2e tests now passing
+      - ✅ Total e2e tests: 105 passed, 2 skipped
+      - ✅ Works with both .firebasestorage.app and .appspot.com buckets
+      
+      Impact:
+      - Unblocked e2e test suite
+      - Signed URLs now work correctly with new Firebase Storage bucket format
+      - Backward compatible with old bucket format
 
 security_tasks:
   - name: H-001 - JWT Algorithm Validation
