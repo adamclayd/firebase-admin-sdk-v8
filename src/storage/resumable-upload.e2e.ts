@@ -182,6 +182,68 @@ describe('Resumable Upload E2E Tests', () => {
     }, 30000);
   });
 
+  describe('ReadableStream Support', () => {
+    it('should upload from ReadableStream', async () => {
+      const filePath = trackFile(`${TEST_PREFIX}stream-${Date.now()}.txt`);
+      const content = 'Hello from ReadableStream!';
+      const data = new TextEncoder().encode(content);
+      
+      // Create a ReadableStream
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        },
+      });
+
+      const metadata = await uploadFileResumable(
+        filePath,
+        stream,
+        'text/plain',
+        { totalSize: data.byteLength }
+      );
+
+      expect(metadata.name).toContain(TEST_PREFIX);
+      expect(metadata.contentType).toBe('text/plain');
+      expect(parseInt(metadata.size)).toBe(data.byteLength);
+    }, 30000);
+
+    it('should upload puppy.png from ReadableStream', async () => {
+      const filePath = trackFile(`${TEST_PREFIX}stream-puppy-${Date.now()}.png`);
+      const imageData = readFileSync(join(process.cwd(), 'resources/puppy.png'));
+      
+      // Create a ReadableStream from the image data
+      // Emit the entire file at once to avoid chunk boundary issues
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(imageData);
+          controller.close();
+        },
+      });
+
+      const progressUpdates: number[] = [];
+      const metadata = await uploadFileResumable(
+        filePath,
+        stream,
+        'image/png',
+        {
+          totalSize: imageData.length,
+          onProgress: (uploaded) => {
+            progressUpdates.push(uploaded);
+          },
+        }
+      );
+
+      expect(metadata.name).toContain(TEST_PREFIX);
+      expect(metadata.contentType).toBe('image/png');
+      expect(parseInt(metadata.size)).toBe(imageData.length);
+      expect(progressUpdates.length).toBeGreaterThan(0);
+      
+      // Verify final progress is complete
+      expect(progressUpdates[progressUpdates.length - 1]).toBe(imageData.length);
+    }, 30000);
+  });
+
   describe('Error Handling', () => {
     it('should handle invalid bucket gracefully', async () => {
       const filePath = `${TEST_PREFIX}invalid-${Date.now()}.txt`;
