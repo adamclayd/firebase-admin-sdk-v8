@@ -28,6 +28,7 @@ export interface ResumableUploadOptions extends UploadOptions {
   chunkSize?: number; // Default: 256KB
   onProgress?: (uploaded: number, total: number) => void;
   resumeToken?: string; // Session URI to resume from previous attempt
+  totalSize?: number; // Required when uploading from ReadableStream
 }
 
 /**
@@ -178,17 +179,62 @@ async function toArrayBuffer(data: ArrayBuffer | Uint8Array | Blob): Promise<Arr
 }
 
 /**
+ * Read chunk from ReadableStream
+ */
+async function readChunkFromStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  chunkSize: number
+): Promise<{ chunk: ArrayBuffer | null; done: boolean }> {
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (totalBytes < chunkSize) {
+    const { value, done } = await reader.read();
+    
+    if (done) {
+      // Stream ended
+      if (totalBytes === 0) {
+        return { chunk: null, done: true };
+      }
+      // Return whatever we have
+      break;
+    }
+    
+    if (value) {
+      chunks.push(value);
+      totalBytes += value.byteLength;
+      
+      // If we've reached the chunk size, stop reading
+      if (totalBytes >= chunkSize) {
+        break;
+      }
+    }
+  }
+
+  // Combine chunks into single ArrayBuffer
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  
+  return { chunk: combined.buffer, done: false };
+}
+
+/**
  * Upload a file with resumable upload support
  * Suitable for large files and unreliable networks
  *
  * @param path - File path in storage
- * @param data - File data as ArrayBuffer, Uint8Array, or Blob
+ * @param data - File data as ArrayBuffer, Uint8Array, Blob, or ReadableStream
  * @param contentType - MIME type of the file
  * @param options - Upload options
  * @returns File metadata
  *
  * @example
  * ```typescript
+ * // Upload from buffer
  * const data = await fetch('https://example.com/large-video.mp4');
  * const buffer = await data.arrayBuffer();
  *
@@ -203,18 +249,35 @@ async function toArrayBuffer(data: ArrayBuffer | Uint8Array | Blob): Promise<Arr
  *     },
  *   }
  * );
+ *
+ * // Upload from stream (true streaming - no memory limit)
+ * const response = await fetch('https://example.com/huge-file.mp4');
+ * const metadata = await uploadFileResumable(
+ *   'videos/huge.mp4',
+ *   response.body!, // ReadableStream
+ *   'video/mp4',
+ *   {
+ *     totalSize: parseInt(response.headers.get('content-length')!),
+ *     chunkSize: 1024 * 1024, // 1MB chunks
+ *   }
+ * );
  * ```
  */
 export async function uploadFileResumable(
   path: string,
-  data: ArrayBuffer | Uint8Array | Blob,
+  data: ArrayBuffer | Uint8Array | Blob | ReadableStream<Uint8Array>,
   contentType: string,
   options: ResumableUploadOptions = {}
 ): Promise<FileMetadata> {
   const bucket = getDefaultBucket();
   const chunkSize = options.chunkSize || 256 * 1024; // 256KB default
   
-  // Convert to ArrayBuffer
+  // Check if data is a ReadableStream
+  if (data instanceof ReadableStream) {
+    return await uploadFromStream(bucket, path, data, contentType, chunkSize, options);
+  }
+  
+  // Convert to ArrayBuffer for non-stream data
   const buffer = await toArrayBuffer(data);
   const total = buffer.byteLength;
   
@@ -261,4 +324,72 @@ export async function uploadFileResumable(
   }
   
   throw new Error('Upload incomplete - all chunks sent but no completion response');
+}
+
+/**
+ * Upload from ReadableStream (true streaming - no memory limit)
+ */
+async function uploadFromStream(
+  bucket: string,
+  path: string,
+  stream: ReadableStream<Uint8Array>,
+  contentType: string,
+  chunkSize: number,
+  options: ResumableUploadOptions
+): Promise<FileMetadata> {
+  const total = options.totalSize || -1; // -1 means unknown size
+  
+  if (total === -1) {
+    throw new Error('totalSize is required when uploading from ReadableStream');
+  }
+  
+  // Initiate upload session
+  const sessionUri = await initiateResumableUpload(
+    bucket,
+    path,
+    contentType,
+    total,
+    options.metadata
+  );
+  
+  const reader = stream.getReader();
+  let uploaded = 0;
+  let lastResult: ChunkUploadResult | null = null;
+  
+  try {
+    while (true) {
+      // Read chunk from stream
+      const { chunk, done } = await readChunkFromStream(reader, chunkSize);
+      
+      if (done || !chunk) {
+        // Stream ended - check if upload is complete
+        if (lastResult && lastResult.complete) {
+          return lastResult.metadata!;
+        }
+        // If we've uploaded all bytes, the last chunk should have completed
+        if (uploaded === total && lastResult) {
+          return lastResult.metadata!;
+        }
+        break;
+      }
+      
+      // Upload chunk
+      lastResult = await uploadChunk(sessionUri, chunk, uploaded, total);
+      
+      uploaded += chunk.byteLength;
+      
+      // Call progress callback
+      if (options.onProgress) {
+        options.onProgress(uploaded, total);
+      }
+      
+      if (lastResult.complete) {
+        return lastResult.metadata!;
+      }
+    }
+    
+    throw new Error('Stream ended but upload not complete');
+  } finally {
+    reader.releaseLock();
+  }
 }

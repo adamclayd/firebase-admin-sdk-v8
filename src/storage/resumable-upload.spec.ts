@@ -329,4 +329,164 @@ describe('Resumable Uploads', () => {
       expect(chunkCall2[1].headers['Content-Range']).toBe('bytes 10-19/20');
     });
   });
+
+  describe('ReadableStream Support', () => {
+    it('should upload from ReadableStream', async () => {
+      const sessionUri = 'https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadId=123';
+      
+      // Create a ReadableStream
+      const data = new Uint8Array(20);
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        },
+      });
+
+      // Mock initiation
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['Location', sessionUri]]),
+      });
+      
+      // Mock chunk upload (complete)
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          name: 'stream.bin',
+          size: '20',
+        }),
+      });
+
+      const result = await uploadFileResumable(
+        'stream.bin',
+        stream,
+        'application/octet-stream',
+        { totalSize: 20, chunkSize: 262144 }
+      );
+
+      expect(result.name).toBe('stream.bin');
+    });
+
+    it('should upload large stream in multiple chunks', async () => {
+      const sessionUri = 'https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadId=123';
+      const chunkSize = 262144; // 256KB
+      const totalSize = chunkSize * 2; // Exactly 2 chunks for simpler test
+      
+      // Create a ReadableStream that emits exactly 2 chunks
+      const stream = new ReadableStream({
+        start(controller) {
+          // Emit first chunk
+          controller.enqueue(new Uint8Array(chunkSize));
+          // Emit second chunk
+          controller.enqueue(new Uint8Array(chunkSize));
+          controller.close();
+        },
+      });
+
+      // Mock initiation
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['Location', sessionUri]]),
+      });
+      
+      // Mock first chunk (incomplete)
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 308,
+      });
+      
+      // Mock second chunk (complete)
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          name: 'large-stream.bin',
+          size: totalSize.toString(),
+        }),
+      });
+
+      const result = await uploadFileResumable(
+        'large-stream.bin',
+        stream,
+        'application/octet-stream',
+        { totalSize, chunkSize }
+      );
+
+      expect(result).toBeDefined();
+      expect(result.name).toBe('large-stream.bin');
+      expect(global.fetch).toHaveBeenCalledTimes(3); // 1 init + 2 chunks
+    });
+
+    it('should call progress callback for stream uploads', async () => {
+      const sessionUri = 'https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadId=123';
+      const totalSize = 20;
+      const onProgress = jest.fn();
+      
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(20));
+          controller.close();
+        },
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['Location', sessionUri]]),
+      });
+      
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ name: 'stream.bin', size: '20' }),
+      });
+
+      await uploadFileResumable(
+        'stream.bin',
+        stream,
+        'application/octet-stream',
+        { totalSize, chunkSize: 262144, onProgress }
+      );
+
+      expect(onProgress).toHaveBeenCalledWith(20, 20);
+    });
+
+    it('should throw error if totalSize not provided for stream', async () => {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(10));
+          controller.close();
+        },
+      });
+
+      await expect(
+        uploadFileResumable(
+          'stream.bin',
+          stream,
+          'application/octet-stream'
+        )
+      ).rejects.toThrow('totalSize is required when uploading from ReadableStream');
+    });
+
+    it('should handle stream errors gracefully', async () => {
+      const sessionUri = 'https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadId=123';
+      
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.error(new Error('Stream error'));
+        },
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['Location', sessionUri]]),
+      });
+
+      await expect(
+        uploadFileResumable(
+          'stream.bin',
+          stream,
+          'application/octet-stream',
+          { totalSize: 100 }
+        )
+      ).rejects.toThrow('Stream error');
+    });
+  });
 });
