@@ -7,21 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.2.3] - 2026-02-14
+## [2.3.0] - 2026-02-14
 
 ### Added
-- Comprehensive unit tests for Storage module (63 new tests)
+- **Resumable uploads** with `uploadFileResumable()` for large files
+- **True streaming support** with ReadableStream (no memory limit)
+- Progress tracking with callbacks for resumable uploads
+- Resume capability for interrupted uploads
+- Chunked uploads with configurable chunk size (default 256KB)
+- Comprehensive unit tests for Storage module (68 new tests total)
 - Unit tests for `storage/client.ts` (31 tests, 88.11% coverage)
 - Unit tests for `storage/signed-urls.ts` (32 tests, 100% coverage)
+- Unit tests for `storage/resumable-upload.ts` (16 tests, 88.03% coverage)
+- E2E tests for resumable uploads with real Firebase (11 tests)
+- E2E tests for ReadableStream uploads (validated with 1MB files and puppy.png)
+- E2E test for complex nested arrays (message content scenario)
 - Agent Context Protocol (ACP) initialization documentation
+- `.env.example` file with all environment variables documented
 
 ### Changed
-- Improved overall test coverage from 76.15% to 96.02% (+19.87%)
-- Storage module coverage improved from 0% to 91.71%
-- Total test count increased from 339 to 402 tests
+- **BREAKING**: Default storage bucket format changed from `.appspot.com` to `.firebasestorage.app`
+- Improved overall test coverage from 76.15% to 94.87% (+18.72%)
+- Storage module coverage improved from 0% to 89.89%
+- Total test count increased from 339 to 418 tests (+79 tests)
+- Fixed storage e2e tests to properly initialize Firebase app
 
 ### Fixed
 - Storage module now has proper unit test coverage (previously only e2e tests)
+- Storage e2e tests now initialize app correctly
+- Bucket naming updated to match new Firebase format
+- Array serialization confirmed working (not serialized to JSON strings)
 
 ## [2.2.2] - 2026-02-13
 
