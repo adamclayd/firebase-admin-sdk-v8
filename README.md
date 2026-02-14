@@ -352,6 +352,88 @@ Clear the cached access token.
 clearTokenCache();
 ```
 
+### Storage - Resumable Uploads
+
+#### `uploadFileResumable(bucket, path, data, contentType, options?): Promise<FileMetadata>`
+
+Upload large files with resumable upload support. Suitable for files >10MB, unreliable networks, or when progress tracking is needed.
+
+**Features:**
+- ✅ Chunked uploads (configurable chunk size)
+- ✅ Progress tracking with callbacks
+- ✅ Resume interrupted uploads
+- ✅ Memory efficient (doesn't load entire file at once)
+- ✅ Automatic retry on chunk failure
+
+```typescript
+import { uploadFileResumable } from '@prmichaelsen/firebase-admin-sdk-v8';
+
+// Upload large file with progress tracking
+const data = await fetch('https://example.com/large-video.mp4');
+const buffer = await data.arrayBuffer();
+
+const metadata = await uploadFileResumable(
+  'my-bucket.appspot.com',
+  'videos/large.mp4',
+  buffer,
+  'video/mp4',
+  {
+    chunkSize: 512 * 1024, // 512KB chunks (default: 256KB)
+    onProgress: (uploaded, total) => {
+      const percent = (uploaded / total * 100).toFixed(2);
+      console.log(`Upload progress: ${percent}%`);
+    },
+    metadata: { userId: '123', category: 'videos' },
+  }
+);
+
+console.log('Upload complete:', metadata);
+```
+
+**Resume interrupted upload:**
+
+```typescript
+let sessionUri: string;
+
+try {
+  const metadata = await uploadFileResumable(
+    bucket,
+    path,
+    data,
+    contentType,
+    {
+      onProgress: (uploaded, total) => {
+        // Save session URI for resume
+        sessionUri = /* get from response */;
+      },
+    }
+  );
+} catch (error) {
+  // Resume from where it left off
+  const metadata = await uploadFileResumable(
+    bucket,
+    path,
+    data,
+    contentType,
+    {
+      resumeToken: sessionUri, // Resume from previous session
+    }
+  );
+}
+```
+
+**When to use:**
+- Files larger than 10MB
+- Unreliable network conditions
+- Need progress reporting
+- Files that may exceed memory limits
+
+**When to use simple `uploadFile()` instead:**
+- Small files (<10MB)
+- Reliable network
+- No progress tracking needed
+- Edge runtime with memory constraints
+
 ## 💡 Examples
 
 See [EXAMPLES.md](./EXAMPLES.md) for comprehensive examples including:

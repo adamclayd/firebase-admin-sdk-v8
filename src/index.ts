@@ -33,6 +33,7 @@ export {
   listFiles,
   fileExists,
   generateSignedUrl,
+  uploadFileResumable,
 } from './storage';
 
 // Field value helpers
@@ -74,4 +75,5 @@ export type {
   FileMetadata,
   ListFilesResult,
   SignedUrlOptions,
+  ResumableUploadOptions,
 } from './storage';
