@@ -57,7 +57,7 @@ describe('Storage Client', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://storage.googleapis.com/upload/storage/v1/b/test-project.appspot.com/o'),
+        expect.stringContaining('https://storage.googleapis.com/upload/storage/v1/b/test-project.firebasestorage.app/o'),
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -183,7 +183,7 @@ describe('Storage Client', () => {
       const result = await downloadFile('test.txt');
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.appspot.com/o/test.txt?alt=media'),
+        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.firebasestorage.app/o/test.txt?alt=media'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer mock-access-token',
@@ -229,7 +229,7 @@ describe('Storage Client', () => {
       await deleteFile('test.txt');
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.appspot.com/o/test.txt'),
+        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.firebasestorage.app/o/test.txt'),
         expect.objectContaining({
           method: 'DELETE',
           headers: expect.objectContaining({
@@ -270,7 +270,7 @@ describe('Storage Client', () => {
       const result = await getFileMetadata('test.txt');
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.appspot.com/o/test.txt'),
+        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.firebasestorage.app/o/test.txt'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer mock-access-token',
@@ -307,7 +307,7 @@ describe('Storage Client', () => {
       const result = await listFiles();
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.appspot.com/o'),
+        expect.stringContaining('https://storage.googleapis.com/storage/v1/b/test-project.firebasestorage.app/o'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer mock-access-token',

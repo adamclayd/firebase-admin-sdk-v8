@@ -70,9 +70,9 @@ function getDefaultBucket(): string {
     return customBucket;
   }
   
-  // Fall back to default appspot bucket
+  // Fall back to default Firebase Storage bucket (new format)
   const projectId = getProjectId();
-  return `${projectId}.appspot.com`;
+  return `${projectId}.firebasestorage.app`;
 }
 
 /**
