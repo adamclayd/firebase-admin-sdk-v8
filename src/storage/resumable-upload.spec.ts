@@ -4,16 +4,21 @@
 
 import { uploadFileResumable } from './resumable-upload';
 import * as tokenGeneration from '../token-generation';
+import * as config from '../config';
 
 // Mock dependencies
 jest.mock('../token-generation');
+jest.mock('../config');
 
 const mockGetAdminAccessToken = tokenGeneration.getAdminAccessToken as jest.MockedFunction<typeof tokenGeneration.getAdminAccessToken>;
+const mockGetProjectId = config.getProjectId as jest.MockedFunction<typeof config.getProjectId>;
 
 describe('Resumable Uploads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetAdminAccessToken.mockResolvedValue('mock-access-token');
+    mockGetProjectId.mockReturnValue('test-project');
+    delete process.env.FIREBASE_STORAGE_BUCKET;
     global.fetch = jest.fn();
   });
 
@@ -44,7 +49,6 @@ describe('Resumable Uploads', () => {
 
       const data = new TextEncoder().encode('Hello World');
       const result = await uploadFileResumable(
-        'test-bucket',
         'test.txt',
         data.buffer,
         'text/plain'
@@ -87,7 +91,6 @@ describe('Resumable Uploads', () => {
       });
 
       const result = await uploadFileResumable(
-        'test-bucket',
         'large.bin',
         data,
         'application/octet-stream',
@@ -124,7 +127,6 @@ describe('Resumable Uploads', () => {
       });
 
       await uploadFileResumable(
-        'test-bucket',
         'test.bin',
         data,
         'application/octet-stream',
@@ -161,7 +163,6 @@ describe('Resumable Uploads', () => {
 
       const onProgress = jest.fn();
       await uploadFileResumable(
-        'test-bucket',
         'resumed.bin',
         data,
         'application/octet-stream',
@@ -192,7 +193,6 @@ describe('Resumable Uploads', () => {
 
       const blob = new Blob(['Hello'], { type: 'text/plain' });
       const result = await uploadFileResumable(
-        'test-bucket',
         'blob.txt',
         blob,
         'text/plain'
@@ -216,7 +216,6 @@ describe('Resumable Uploads', () => {
 
       const data = new Uint8Array(5);
       await uploadFileResumable(
-        'test-bucket',
         'test.txt',
         data,
         'text/plain',
@@ -237,7 +236,7 @@ describe('Resumable Uploads', () => {
 
       const data = new Uint8Array(10);
       await expect(
-        uploadFileResumable('test-bucket', 'test.txt', data, 'text/plain')
+        uploadFileResumable('test.txt', data, 'text/plain')
       ).rejects.toThrow('Failed to initiate resumable upload');
     });
 
@@ -249,7 +248,7 @@ describe('Resumable Uploads', () => {
 
       const data = new Uint8Array(10);
       await expect(
-        uploadFileResumable('test-bucket', 'test.txt', data, 'text/plain')
+        uploadFileResumable('test.txt', data, 'text/plain')
       ).rejects.toThrow('No session URI returned');
     });
 
@@ -268,7 +267,7 @@ describe('Resumable Uploads', () => {
 
       const data = new Uint8Array(10);
       await expect(
-        uploadFileResumable('test-bucket', 'test.txt', data, 'text/plain')
+        uploadFileResumable('test.txt', data, 'text/plain')
       ).rejects.toThrow('Chunk upload failed');
     });
 
@@ -288,7 +287,6 @@ describe('Resumable Uploads', () => {
       });
 
       await uploadFileResumable(
-        'test-bucket',
         'test.bin',
         data,
         'application/octet-stream',
@@ -318,7 +316,6 @@ describe('Resumable Uploads', () => {
       });
 
       await uploadFileResumable(
-        'test-bucket',
         'test.bin',
         data,
         'application/octet-stream',

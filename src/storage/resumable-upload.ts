@@ -4,9 +4,22 @@
  */
 
 import { getAdminAccessToken } from '../token-generation';
+import { getProjectId } from '../config';
 import type { FileMetadata, UploadOptions } from './client';
 
 const UPLOAD_API_BASE = 'https://storage.googleapis.com/upload/storage/v1';
+
+/**
+ * Get the default storage bucket name
+ */
+function getDefaultBucket(): string {
+  const customBucket = process.env.FIREBASE_STORAGE_BUCKET;
+  if (customBucket) {
+    return customBucket;
+  }
+  const projectId = getProjectId();
+  return `${projectId}.appspot.com`;
+}
 
 /**
  * Options for resumable uploads
@@ -167,21 +180,19 @@ async function toArrayBuffer(data: ArrayBuffer | Uint8Array | Blob): Promise<Arr
 /**
  * Upload a file with resumable upload support
  * Suitable for large files and unreliable networks
- * 
- * @param bucket - Storage bucket name
+ *
  * @param path - File path in storage
  * @param data - File data as ArrayBuffer, Uint8Array, or Blob
  * @param contentType - MIME type of the file
  * @param options - Upload options
  * @returns File metadata
- * 
+ *
  * @example
  * ```typescript
  * const data = await fetch('https://example.com/large-video.mp4');
  * const buffer = await data.arrayBuffer();
- * 
+ *
  * const metadata = await uploadFileResumable(
- *   'my-bucket.appspot.com',
  *   'videos/large.mp4',
  *   buffer,
  *   'video/mp4',
@@ -195,12 +206,12 @@ async function toArrayBuffer(data: ArrayBuffer | Uint8Array | Blob): Promise<Arr
  * ```
  */
 export async function uploadFileResumable(
-  bucket: string,
   path: string,
   data: ArrayBuffer | Uint8Array | Blob,
   contentType: string,
   options: ResumableUploadOptions = {}
 ): Promise<FileMetadata> {
+  const bucket = getDefaultBucket();
   const chunkSize = options.chunkSize || 256 * 1024; // 256KB default
   
   // Convert to ArrayBuffer
