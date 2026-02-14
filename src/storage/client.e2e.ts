@@ -1,16 +1,18 @@
 /**
  * E2E tests for Firebase Storage operations
- * 
+ *
  * Prerequisites:
- * - FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY environment variable set
+ * - service-account.json file with valid credentials
+ * - Firebase project: prmichaelsen-firebase-e2e
  * - Firebase Storage bucket configured
  * - Storage rules allow admin access
- * 
+ *
  * Run with: npm run test:e2e
  */
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { initializeApp } from '../config';
 import {
   uploadFile,
   downloadFile,
@@ -20,10 +22,32 @@ import {
   fileExists,
 } from './client';
 import { generateSignedUrl } from './signed-urls';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('Storage E2E Tests', () => {
   const TEST_PREFIX = 'e2e-test-';
   const testFiles: string[] = [];
+
+  beforeAll(() => {
+    // Load service account from filesystem
+    const serviceAccountPath = path.join(__dirname, '../../service-account.json');
+    
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(
+        'service-account.json not found. Please add your Firebase service account credentials to the project root.'
+      );
+    }
+    
+    const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf-8');
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    
+    // Initialize with service account and project ID
+    initializeApp({
+      serviceAccount,
+      projectId: 'prmichaelsen-firebase-e2e',
+    });
+  });
 
   // Helper to track files for cleanup
   function trackFile(path: string): string {

@@ -815,5 +815,49 @@ describe('Firestore E2E Tests', () => {
       expect(doc?.field0).toBe('value0');
       expect(doc?.field49).toBe('value49');
     });
+
+    it('should handle complex nested arrays with objects (message content scenario)', async () => {
+      const docId = `test-${timestamp}-message-content`;
+      edgeTestDocs.push(docId);
+
+      // This tests the exact scenario from the task document
+      const messageContent = [
+        { type: 'text', text: 'what do you see in this image?' },
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: 'image/png',
+            data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+          }
+        }
+      ];
+
+      await setDocument(TEST_COLLECTION, docId, {
+        content: messageContent,
+        timestamp: new Date().toISOString(),
+        _test: true,
+      });
+
+      const doc = await getDocument(TEST_COLLECTION, docId);
+      
+      // Verify the content is an array, not a string
+      expect(Array.isArray(doc?.content)).toBe(true);
+      expect(doc?.content).toHaveLength(2);
+      
+      // Verify first element (text)
+      expect(doc?.content[0].type).toBe('text');
+      expect(doc?.content[0].text).toBe('what do you see in this image?');
+      
+      // Verify second element (image with nested source object)
+      expect(doc?.content[1].type).toBe('image');
+      expect(doc?.content[1].source).toBeDefined();
+      expect(doc?.content[1].source.type).toBe('base64');
+      expect(doc?.content[1].source.media_type).toBe('image/png');
+      expect(doc?.content[1].source.data).toContain('iVBORw0KGgo');
+      
+      // Most importantly: verify it's NOT a JSON string
+      expect(typeof doc?.content).not.toBe('string');
+    });
   });
 });
