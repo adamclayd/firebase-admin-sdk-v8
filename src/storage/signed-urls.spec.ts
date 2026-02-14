@@ -294,7 +294,7 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
       // The signature is based on the canonical request which includes the HTTP method
       // We need to mock digest to return different hashes for different inputs
       let digestCallCount = 0;
-      (crypto.subtle.digest as jest.Mock).mockImplementation(async (_alg, data) => {
+      (crypto.subtle.digest as jest.Mock).mockImplementation(async (_alg, _data) => {
         // Return different hash for each call to ensure different string-to-sign
         const hash = new Uint8Array(32);
         hash[0] = digestCallCount++; // Make each hash unique

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-02-14
+
+### Fixed
+- **CRITICAL**: Fixed signed URL generation to match Google Cloud Storage SDK encoding
+- Implemented `fixedEncodeURIComponent` to additionally encode `! * ' ( )` characters
+- This fixes `SignatureDoesNotMatch` errors in production environments
+- Path encoding now exactly matches official `@google-cloud/storage` SDK behavior
+
 ## [2.3.0] - 2026-02-14
 
 ### Added

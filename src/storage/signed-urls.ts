@@ -54,6 +54,18 @@ function actionToMethod(action: 'read' | 'write' | 'delete'): string {
 }
 
 /**
+ * Encode URI component with additional encoding for reserved characters
+ * Matches Google Cloud Storage SDK behavior
+ * Encodes: A-Z a-z 0-9 and also ! * ' ( )
+ */
+function fixedEncodeURIComponent(str: string): string {
+  return encodeURIComponent(str).replace(
+    /[!'()*]/g,
+    c => '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
+/**
  * Compute SHA-256 hash of a string and return as hex
  */
 async function sha256Hex(str: string): Promise<string> {
@@ -198,7 +210,8 @@ export async function generateSignedUrl(
   // Canonical request
   // Note: The path must be URL-encoded for the canonical request
   // Each segment of the path should be encoded separately
-  const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  // Using fixedEncodeURIComponent to match Google Cloud Storage SDK behavior
+  const encodedPath = path.split('/').map(segment => fixedEncodeURIComponent(segment)).join('/');
   const canonicalUri = `/${bucket}/${encodedPath}`;
   
   // Build canonical request according to V4 signing spec
@@ -206,11 +219,12 @@ export async function generateSignedUrl(
   // HTTP_METHOD\n
   // CANONICAL_URI\n
   // CANONICAL_QUERY_STRING\n
-  // CANONICAL_HEADERS\n (canonicalHeaders already ends with \n)
-  // \n (empty line - need to add this)
+  // CANONICAL_HEADERS\n
+  // \n (empty line separating headers from signed headers)
   // SIGNED_HEADERS\n
   // PAYLOAD_HASH
-  // Note: canonicalHeaders already has trailing \n, so we add another \n for the empty line
+  //
+  // Note: canonicalHeaders already ends with \n, so the template below adds another \n to create the required empty line
   const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\nUNSIGNED-PAYLOAD`;
   
   // String to sign
