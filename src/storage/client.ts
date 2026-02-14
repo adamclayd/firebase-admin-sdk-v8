@@ -61,7 +61,7 @@ export interface ListFilesResult {
  * Get the default storage bucket name
  *
  * Checks FIREBASE_STORAGE_BUCKET environment variable first,
- * then falls back to {projectId}.appspot.com
+ * then falls back to {projectId}.firebasestorage.app
  */
 function getDefaultBucket(): string {
   // Check for custom bucket name in environment

@@ -398,14 +398,14 @@ describe('Firestore E2E Tests', () => {
     const credentialId = `cred-${timestamp}`;
     
     // Test path similar to your error:
-    // agentbase.users/{userId}/credentials/instagram/{docId}
+    // agentbase.users/{userId}/credentials/{docId}
     const userCollectionPath = `${TEST_COLLECTION}.users`; // Collection with dot in name
-    const credentialsPath = `${userCollectionPath}/${userId}/credentials/instagram`;
+    const credentialCollectionPath = `${userCollectionPath}/${userId}/credentials`;
     
     afterAll(async () => {
       // Cleanup
       try {
-        await deleteDocument(credentialsPath, credentialId);
+        await deleteDocument(credentialCollectionPath, credentialId);
       } catch (error) {
         // Ignore
       }
@@ -437,7 +437,7 @@ describe('Firestore E2E Tests', () => {
 
       // Create credential in 4-level deep subcollection
       // Path: collection.with.dot/userId/credentials/instagram/credentialId
-      await setDocument(credentialsPath, credentialId, {
+      await setDocument(credentialCollectionPath, credentialId, {
         access_token: 'test_token',
         user_id: '12345',
         expires_in: 5184000,
@@ -445,7 +445,7 @@ describe('Firestore E2E Tests', () => {
       });
 
       // Verify it was created
-      const credential = await getDocument(credentialsPath, credentialId);
+      const credential = await getDocument(credentialCollectionPath, credentialId);
       expect(credential).not.toBeNull();
       expect(credential?.access_token).toBe('test_token');
       expect(credential?.user_id).toBe('12345');
@@ -458,14 +458,14 @@ describe('Firestore E2E Tests', () => {
         _test: true,
       });
 
-      await setDocument(credentialsPath, credentialId, {
+      await setDocument(credentialCollectionPath, credentialId, {
         access_token: 'test_token',
         user_id: '12345',
         _test: true,
       });
 
       // Query the deeply nested collection
-      const results = await queryDocuments(credentialsPath, {
+      const results = await queryDocuments(credentialCollectionPath, {
         where: [{ field: '_test', op: '==', value: true }],
       });
 
@@ -482,20 +482,20 @@ describe('Firestore E2E Tests', () => {
         _test: true,
       });
 
-      await setDocument(credentialsPath, credentialId, {
+      await setDocument(credentialCollectionPath, credentialId, {
         access_token: 'test_token',
         user_id: '12345',
         _test: true,
       });
 
       // Update the credential
-      await updateDocument(credentialsPath, credentialId, {
+      await updateDocument(credentialCollectionPath, credentialId, {
         access_token: 'updated_token',
         expires_in: 7200,
       });
 
       // Verify update
-      const updated = await getDocument(credentialsPath, credentialId);
+      const updated = await getDocument(credentialCollectionPath, credentialId);
       expect(updated?.access_token).toBe('updated_token');
       expect(updated?.expires_in).toBe(7200);
       expect(updated?.user_id).toBe('12345'); // Should still exist

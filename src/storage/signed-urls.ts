@@ -14,7 +14,7 @@ function getStorageBucket(): string {
     return customBucket;
   }
   const projectId = getProjectId();
-  return `${projectId}.appspot.com`;
+  return `${projectId}.firebasestorage.app`;
 }
 
 /**

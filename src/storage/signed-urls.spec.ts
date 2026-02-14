@@ -60,7 +60,7 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
       });
 
       expect(url).toContain('https://storage.googleapis.com');
-      expect(url).toContain('test-project.appspot.com');
+      expect(url).toContain('test-project.firebasestorage.app');
       expect(url).toContain('test.txt');
       expect(url).toContain('X-Goog-Algorithm=GOOG4-RSA-SHA256');
       expect(url).toContain('X-Goog-Credential');
@@ -138,14 +138,14 @@ fWIcPm15j9zB/FaC8qF9bb3I5Jq5AgMBAAECggEAD+onAtVye4ic7VR7V50DF9bE
     });
 
     it('should use custom bucket from environment', async () => {
-      process.env.FIREBASE_STORAGE_BUCKET = 'custom-bucket.appspot.com';
+      process.env.FIREBASE_STORAGE_BUCKET = 'custom-bucket.firebasestorage.app';
 
       const url = await generateSignedUrl('test.txt', {
         action: 'read',
         expires: 3600,
       });
 
-      expect(url).toContain('custom-bucket.appspot.com');
+      expect(url).toContain('custom-bucket.firebasestorage.app');
     });
 
     it('should handle file paths with special characters', async () => {

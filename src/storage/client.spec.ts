@@ -41,7 +41,7 @@ describe('Storage Client', () => {
         ok: true,
         json: async () => ({
           name: 'test.txt',
-          bucket: 'test-project.appspot.com',
+          bucket: 'test-project.firebasestorage.app',
           size: '11',
           contentType: 'text/plain',
           timeCreated: '2024-01-01T00:00:00Z',
@@ -75,7 +75,7 @@ describe('Storage Client', () => {
         ok: true,
         json: async () => ({
           name: 'test.txt',
-          bucket: 'test-project.appspot.com',
+          bucket: 'test-project.firebasestorage.app',
           size: '11',
           contentType: 'text/plain',
         }),
@@ -93,7 +93,7 @@ describe('Storage Client', () => {
         ok: true,
         json: async () => ({
           name: 'test.txt',
-          bucket: 'test-project.appspot.com',
+          bucket: 'test-project.firebasestorage.app',
           size: '11',
           contentType: 'text/plain',
         }),
@@ -127,7 +127,7 @@ describe('Storage Client', () => {
     });
 
     it('should use custom bucket from environment', async () => {
-      process.env.FIREBASE_STORAGE_BUCKET = 'custom-bucket.appspot.com';
+      process.env.FIREBASE_STORAGE_BUCKET = 'custom-bucket.firebasestorage.app';
       
       const mockResponse = {
         ok: true,
@@ -139,7 +139,7 @@ describe('Storage Client', () => {
       await uploadFile('test.txt', data);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('custom-bucket.appspot.com'),
+        expect.stringContaining('custom-bucket.firebasestorage.app'),
         expect.any(Object)
       );
     });
@@ -254,7 +254,7 @@ describe('Storage Client', () => {
     it('should get file metadata', async () => {
       const mockMetadata = {
         name: 'test.txt',
-        bucket: 'test-project.appspot.com',
+        bucket: 'test-project.firebasestorage.app',
         size: '1024',
         contentType: 'text/plain',
         timeCreated: '2024-01-01T00:00:00Z',
