@@ -5,7 +5,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { initializeApp, getProjectId } from '../config';
+import { initializeApp } from '../config';
 import { uploadFileResumable } from './resumable-upload';
 import { deleteFile, getFileMetadata } from './client';
 import * as fs from 'fs';
@@ -14,7 +14,6 @@ import * as path from 'path';
 describe('Resumable Upload E2E Tests', () => {
   const TEST_PREFIX = 'e2e-resumable-';
   const testFiles: string[] = [];
-  let bucket: string;
 
   beforeAll(() => {
     // Load service account from filesystem
@@ -34,9 +33,6 @@ describe('Resumable Upload E2E Tests', () => {
       serviceAccount,
       projectId: 'prmichaelsen-firebase-e2e',
     });
-    
-    // Get bucket name from project ID
-    bucket = `${getProjectId()}.appspot.com`;
   });
 
   // Helper to track files for cleanup
@@ -114,7 +110,7 @@ describe('Resumable Upload E2E Tests', () => {
         arrayBuffer,
         'image/png',
         {
-          chunkSize: 50 * 1024, // 50KB chunks to get multiple progress updates
+          chunkSize: 262144, // 256KB - minimum chunk size for GCS
           onProgress: (uploaded: number, total: number) => {
             progressUpdates.push({ uploaded, total });
           },
@@ -172,7 +168,7 @@ describe('Resumable Upload E2E Tests', () => {
         imageData.byteOffset + imageData.byteLength
       );
 
-      const chunkSize = 10 * 1024; // 10KB chunks (very small to test chunking)
+      const chunkSize = 262144; // 256KB - minimum chunk size for GCS
       
       const metadata = await uploadFileResumable(
         filePath,
