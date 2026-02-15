@@ -456,6 +456,267 @@ export async function signInWithCustomToken(
 }
 
 /**
+ * Options for creating a session cookie
+ */
+export interface SessionCookieOptions {
+  /**
+   * Session duration in milliseconds
+   * Maximum: 14 days (1,209,600,000 ms)
+   * Minimum: 5 minutes (300,000 ms)
+   */
+  expiresIn: number;
+}
+
+/**
+ * Create a session cookie from an ID token
+ *
+ * Session cookies can have a maximum duration of 14 days and are
+ * useful for maintaining long-lived authentication sessions.
+ *
+ * @param idToken - Valid Firebase ID token
+ * @param options - Session cookie options
+ * @returns Session cookie string
+ *
+ * @example
+ * ```typescript
+ * // Create 14-day session cookie
+ * const sessionCookie = await createSessionCookie(idToken, {
+ *   expiresIn: 60 * 60 * 24 * 14 * 1000
+ * });
+ *
+ * // Set as HTTP-only cookie
+ * response.headers.set('Set-Cookie',
+ *   `session=${sessionCookie}; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict`
+ * );
+ * ```
+ */
+export async function createSessionCookie(
+  idToken: string,
+  options: SessionCookieOptions
+): Promise<string> {
+  // Validate inputs
+  if (!idToken || typeof idToken !== 'string') {
+    throw new Error('idToken must be a non-empty string');
+  }
+  
+  if (!options.expiresIn || typeof options.expiresIn !== 'number') {
+    throw new Error('expiresIn must be a number');
+  }
+  
+  // Validate expiration range
+  const MIN_DURATION = 5 * 60 * 1000; // 5 minutes
+  const MAX_DURATION = 14 * 24 * 60 * 60 * 1000; // 14 days
+  
+  if (options.expiresIn < MIN_DURATION) {
+    throw new Error(`expiresIn must be at least ${MIN_DURATION}ms (5 minutes)`);
+  }
+  
+  if (options.expiresIn > MAX_DURATION) {
+    throw new Error(`expiresIn must be at most ${MAX_DURATION}ms (14 days)`);
+  }
+  
+  // Get access token for API call
+  const { getAdminAccessToken } = await import('./token-generation');
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+  
+  // Call Identity Toolkit API to create session cookie
+  const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}:createSessionCookie`;
+  
+  const validDurationSeconds = Math.floor(options.expiresIn / 1000);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      idToken,
+      validDuration: validDurationSeconds.toString(), // Must be string per API spec
+    }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `Failed to create session cookie: ${response.status}`;
+    
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error && errorJson.error.message) {
+        errorMessage += ` - ${errorJson.error.message}`;
+      }
+    } catch {
+      errorMessage += ` - ${errorText}`;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  const result = await response.json();
+  return result.sessionCookie;
+}
+
+/**
+ * Verify a Firebase session cookie
+ *
+ * Session cookies are verified similarly to ID tokens but have
+ * different expiration times (up to 14 days) and issuer format.
+ *
+ * @param sessionCookie - Session cookie string to verify
+ * @param checkRevoked - Whether to check if the token has been revoked (not yet implemented)
+ * @returns Decoded token claims
+ *
+ * @example
+ * ```typescript
+ * // Verify session cookie from request
+ * const sessionCookie = request.cookies.get('session');
+ * const decodedToken = await verifySessionCookie(sessionCookie);
+ * console.log('User ID:', decodedToken.uid);
+ * ```
+ */
+export async function verifySessionCookie(
+  sessionCookie: string,
+  checkRevoked: boolean = false
+): Promise<DecodedIdToken> {
+  if (!sessionCookie || typeof sessionCookie !== 'string') {
+    throw new Error('sessionCookie must be a non-empty string');
+  }
+  
+  // Session cookies are JWTs, so we can verify them like ID tokens
+  // The main difference is the issuer claim
+  
+  try {
+    // Decode JWT parts
+    const parts = sessionCookie.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid session cookie format');
+    }
+    
+    const [headerB64, payloadB64] = parts;
+    
+    // Decode header
+    const headerJson = atob(headerB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const header: JWTHeader = JSON.parse(headerJson);
+    
+    // Decode payload
+    const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload: any = JSON.parse(payloadJson);
+    
+    // Validate claims
+    const projectId = getProjectId();
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Check expiration
+    if (!payload.exp || payload.exp < now) {
+      throw new Error('Session cookie has expired');
+    }
+    
+    // Check issued at
+    if (!payload.iat || payload.iat > now) {
+      throw new Error('Session cookie issued in the future');
+    }
+    
+    // Check audience (should be project ID)
+    if (payload.aud !== projectId) {
+      throw new Error(`Session cookie has incorrect audience. Expected ${projectId}, got ${payload.aud}`);
+    }
+    
+    // Check issuer (session cookies have different issuer than ID tokens)
+    const expectedIssuer = `https://session.firebase.google.com/${projectId}`;
+    if (payload.iss !== expectedIssuer) {
+      throw new Error(`Session cookie has incorrect issuer. Expected ${expectedIssuer}, got ${payload.iss}`);
+    }
+    
+    // Check subject (user ID)
+    if (!payload.sub || typeof payload.sub !== 'string' || payload.sub.length === 0) {
+      throw new Error('Session cookie has no subject (user ID)');
+    }
+    
+    // Verify signature using public keys
+    await verifySessionCookieSignature(sessionCookie, header, payload);
+    
+    // TODO: Check if revoked (if requested)
+    // This would require calling the Identity Toolkit API
+    // to check the user's tokensValidAfterTime
+    if (checkRevoked) {
+      // For now, we skip this check
+      // Future implementation would call:
+      // await checkIfTokenRevoked(payload.sub);
+    }
+    
+    // Return decoded token
+    return {
+      uid: payload.sub,
+      aud: payload.aud,
+      auth_time: payload.auth_time,
+      exp: payload.exp,
+      iat: payload.iat,
+      iss: payload.iss,
+      sub: payload.sub,
+      email: payload.email,
+      email_verified: payload.email_verified,
+      firebase: payload.firebase,
+      ...payload,
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to verify session cookie: ${error.message}`);
+  }
+}
+
+/**
+ * Verify JWT signature using Firebase public keys for session cookies
+ */
+async function verifySessionCookieSignature(
+  jwt: string,
+  header: JWTHeader,
+  payload: any
+): Promise<void> {
+  // Get public keys for session cookies
+  // Session cookies use the session.firebase.google.com issuer
+  const keys = await fetchPublicKeys(payload.iss);
+  
+  const kid = header.kid;
+  if (!kid || !keys[kid]) {
+    throw new Error('Session cookie has invalid key ID');
+  }
+  
+  // Get the public key
+  const publicKeyPem = keys[kid];
+  
+  // Import public key
+  const publicKey = await importPublicKeyFromX509(publicKeyPem);
+  
+  // Verify signature
+  const [headerAndPayload, signature] = [
+    jwt.split('.').slice(0, 2).join('.'),
+    jwt.split('.')[2]
+  ];
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(headerAndPayload);
+  
+  // Decode base64url signature
+  const signatureBase64 = signature.replace(/-/g, '+').replace(/_/g, '/');
+  const signatureBinary = atob(signatureBase64);
+  const signatureBytes = new Uint8Array(signatureBinary.length);
+  for (let i = 0; i < signatureBinary.length; i++) {
+    signatureBytes[i] = signatureBinary.charCodeAt(i);
+  }
+  
+  const isValid = await crypto.subtle.verify(
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    publicKey,
+    signatureBytes,
+    data
+  );
+  
+  if (!isValid) {
+    throw new Error('Session cookie signature verification failed');
+  }
+}
+
+/**
  * Get Auth instance (for compatibility, but not used in new implementation)
  * @deprecated Use verifyIdToken directly
  */

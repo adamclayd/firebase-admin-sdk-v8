@@ -10,7 +10,7 @@
  */
 
 import { initializeApp } from './config';
-import { verifyIdToken, getUserFromToken, createCustomToken, signInWithCustomToken } from './auth';
+import { verifyIdToken, getUserFromToken, createCustomToken, signInWithCustomToken, createSessionCookie, verifySessionCookie } from './auth';
 import { getAdminAccessToken } from './token-generation';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -298,6 +298,90 @@ describe('Auth E2E Tests', () => {
       // Restore API keys
       if (originalApiKey) process.env.FIREBASE_API_KEY = originalApiKey;
       if (originalPublicApiKey) process.env.PUBLIC_FIREBASE_API_KEY = originalPublicApiKey;
+    });
+  });
+
+  describe('Session Cookies', () => {
+    const hasApiKey = !!(process.env.FIREBASE_API_KEY || process.env.PUBLIC_FIREBASE_API_KEY);
+
+    (hasApiKey ? it : it.skip)('should create and verify session cookie', async () => {
+      // Step 1: Create a custom token
+      const uid = `test-user-${Date.now()}`;
+      const customToken = await createCustomToken(uid);
+      
+      // Step 2: Exchange for ID token
+      const credentials = await signInWithCustomToken(customToken);
+      const idToken = credentials.idToken;
+      
+      // Step 3: Create session cookie (1 hour duration)
+      const sessionCookie = await createSessionCookie(idToken, {
+        expiresIn: 60 * 60 * 1000, // 1 hour
+      });
+      
+      expect(sessionCookie).toBeDefined();
+      expect(typeof sessionCookie).toBe('string');
+      expect(sessionCookie.split('.').length).toBe(3); // JWT format
+      
+      // Step 4: Verify session cookie
+      const decodedToken = await verifySessionCookie(sessionCookie);
+      
+      expect(decodedToken.uid).toBe(uid);
+      expect(decodedToken.iss).toContain('session.firebase.google.com');
+      expect(decodedToken.aud).toBe('prmichaelsen-firebase-e2e');
+    }, 30000);
+
+    (hasApiKey ? it : it.skip)('should create session cookie with 14-day expiration', async () => {
+      // Create custom token and exchange for ID token
+      const uid = `test-user-long-${Date.now()}`;
+      const customToken = await createCustomToken(uid);
+      const credentials = await signInWithCustomToken(customToken);
+      
+      // Create 14-day session cookie
+      const sessionCookie = await createSessionCookie(credentials.idToken, {
+        expiresIn: 60 * 60 * 24 * 14 * 1000, // 14 days
+      });
+      
+      // Verify it
+      const decodedToken = await verifySessionCookie(sessionCookie);
+      
+      expect(decodedToken.uid).toBe(uid);
+      
+      // Check expiration is approximately 14 days from now
+      const now = Math.floor(Date.now() / 1000);
+      const expiresIn = decodedToken.exp - now;
+      expect(expiresIn).toBeGreaterThan(13 * 24 * 60 * 60); // At least 13 days
+      expect(expiresIn).toBeLessThan(15 * 24 * 60 * 60); // Less than 15 days
+    }, 30000);
+
+    (hasApiKey ? it : it.skip)('should create session cookie with custom claims', async () => {
+      // Create custom token with claims
+      const uid = `test-user-claims-${Date.now()}`;
+      const customClaims = {
+        role: 'admin',
+        premium: true,
+        level: 5,
+      };
+      
+      const customToken = await createCustomToken(uid, customClaims);
+      const credentials = await signInWithCustomToken(customToken);
+      
+      // Create session cookie
+      const sessionCookie = await createSessionCookie(credentials.idToken, {
+        expiresIn: 60 * 60 * 1000, // 1 hour
+      });
+      
+      // Verify session cookie preserves custom claims
+      const decodedToken = await verifySessionCookie(sessionCookie);
+      
+      expect(decodedToken.uid).toBe(uid);
+      expect((decodedToken as any).role).toBe('admin');
+      expect((decodedToken as any).premium).toBe(true);
+      expect((decodedToken as any).level).toBe(5);
+    }, 30000);
+
+    (!hasApiKey ? it : it.skip)('should skip session cookie e2e tests when API key is not configured', () => {
+      expect(true).toBe(true);
+      console.log('Skipping session cookie e2e tests: FIREBASE_API_KEY not configured');
     });
   });
 });

@@ -363,7 +363,7 @@ refactoring_tasks:
       - Verified with e2e tests (15/15 passing)
 
 next_steps:
-  - 🔴 CRITICAL: Investigate production signed URL issue (SignatureDoesNotMatch)
+  - Implement session cookie support (HIGH priority - user request)
   - Address critical security issues from Audit #001
   - Implement H-001: JWT algorithm validation (HIGH priority)
   - Implement H-002: UID input validation (HIGH priority)

@@ -7,8 +7,16 @@
 export { initializeApp, getConfig, clearConfig } from './config';
 
 // Auth exports
-export { verifyIdToken, getUserFromToken, getAuth, createCustomToken, signInWithCustomToken } from './auth';
-export type { CustomClaims, CustomTokenSignInResponse } from './auth';
+export {
+  verifyIdToken,
+  getUserFromToken,
+  getAuth,
+  createCustomToken,
+  signInWithCustomToken,
+  createSessionCookie,
+  verifySessionCookie
+} from './auth';
+export type { CustomClaims, CustomTokenSignInResponse, SessionCookieOptions } from './auth';
 
 // Firestore exports
 export {

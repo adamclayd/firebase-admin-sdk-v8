@@ -15,6 +15,7 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 - ✅ **Zero Dependencies** - No external dependencies, pure Web APIs (crypto.subtle, fetch)
 - ✅ **JWT Token Generation** - Service account authentication
 - ✅ **ID Token Verification** - Verify Firebase ID tokens (supports v9 and v10 formats)
+- ✅ **Session Cookies** - Create and verify long-lived session cookies (up to 14 days)
 - ✅ **Firebase v10 Compatible** - Supports both old and new token issuer formats
 - ✅ **Firestore REST API** - Full CRUD operations via REST
 - ✅ **Field Value Operations** - increment, arrayUnion, arrayRemove, serverTimestamp, delete
@@ -94,7 +95,26 @@ try {
 }
 ```
 
-### 3. Basic Firestore Operations
+### 3. Session Cookies (Long-Lived Sessions)
+
+```typescript
+import { createSessionCookie, verifySessionCookie } from '@prmichaelsen/firebase-admin-sdk-v8';
+
+// Create 14-day session cookie from ID token
+const sessionCookie = await createSessionCookie(idToken, {
+  expiresIn: 60 * 60 * 24 * 14 * 1000
+});
+
+// Set as HTTP-only cookie
+response.headers.set('Set-Cookie',
+  `session=${sessionCookie}; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict`
+);
+
+// Verify session cookie
+const user = await verifySessionCookie(cookie);
+```
+
+### 4. Basic Firestore Operations
 
 ```typescript
 import { setDocument, getDocument, updateDocument, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';

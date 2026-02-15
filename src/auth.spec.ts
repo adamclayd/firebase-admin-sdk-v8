@@ -3,7 +3,7 @@
  * Tests JWT verification with mocked crypto and fetch
  */
 
-import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache, createCustomToken, signInWithCustomToken } from './auth';
+import { verifyIdToken, getUserFromToken, getAuth, clearPublicKeysCache, createCustomToken, signInWithCustomToken, createSessionCookie, verifySessionCookie } from './auth';
 import * as serviceAccount from './service-account';
 import * as config from './config';
 import * as x509 from './x509';
@@ -736,6 +736,282 @@ describe('Authentication', () => {
         'https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=custom-api-key-123',
         expect.any(Object)
       );
+    });
+  });
+
+  describe('Session Cookies', () => {
+    describe('createSessionCookie', () => {
+      beforeEach(() => {
+        mockGetProjectId.mockReturnValue(TEST_PROJECT_ID);
+        
+        // Mock token generation module
+        jest.doMock('./token-generation', () => ({
+          getAdminAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
+        }));
+      });
+
+      it('should create a session cookie from valid ID token', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ sessionCookie: 'mock-session-cookie-jwt' }),
+        });
+
+        const sessionCookie = await createSessionCookie('valid-id-token', {
+          expiresIn: 60 * 60 * 24 * 14 * 1000, // 14 days
+        });
+
+        expect(sessionCookie).toBe('mock-session-cookie-jwt');
+        expect(global.fetch).toHaveBeenCalledWith(
+          `https://identitytoolkit.googleapis.com/v1/projects/${TEST_PROJECT_ID}:createSessionCookie`,
+          expect.objectContaining({
+            method: 'POST',
+            headers: expect.objectContaining({
+              'Content-Type': 'application/json',
+            }),
+            body: expect.stringContaining('"validDuration":"1209600"'),
+          })
+        );
+      });
+
+      it('should reject expiration less than 5 minutes', async () => {
+        await expect(
+          createSessionCookie('token', { expiresIn: 1000 })
+        ).rejects.toThrow('at least');
+      });
+
+      it('should reject expiration more than 14 days', async () => {
+        
+        
+        await expect(
+          createSessionCookie('token', { expiresIn: 15 * 24 * 60 * 60 * 1000 })
+        ).rejects.toThrow('at most');
+      });
+
+      it('should reject invalid ID token', async () => {
+        
+        
+        await expect(
+          createSessionCookie('', { expiresIn: 3600000 })
+        ).rejects.toThrow('non-empty string');
+      });
+
+      it('should reject invalid expiresIn', async () => {
+        
+        
+        await expect(
+          createSessionCookie('token', { expiresIn: null as any })
+        ).rejects.toThrow('must be a number');
+      });
+
+      it('should handle API errors gracefully', async () => {
+        
+        
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          text: async () => JSON.stringify({
+            error: { message: 'INVALID_ID_TOKEN' }
+          }),
+        });
+
+        await expect(
+          createSessionCookie('invalid-token', { expiresIn: 3600000 })
+        ).rejects.toThrow('INVALID_ID_TOKEN');
+      });
+
+      it('should convert milliseconds to seconds for API', async () => {
+        
+        
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ sessionCookie: 'mock-cookie' }),
+        });
+
+        await createSessionCookie('token', { expiresIn: 7 * 24 * 60 * 60 * 1000 }); // 7 days
+
+        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const body = JSON.parse(fetchCall[1].body);
+        expect(body.validDuration).toBe('604800'); // 7 days in seconds as string
+      });
+    });
+
+    describe('verifySessionCookie', () => {
+      beforeEach(() => {
+        mockGetProjectId.mockReturnValue(TEST_PROJECT_ID);
+        mockImportPublicKeyFromX509.mockResolvedValue(mockPublicKey);
+        
+        // Mock crypto.subtle.verify
+        global.crypto = {
+          subtle: {
+            verify: jest.fn().mockResolvedValue(true),
+          },
+        } as any;
+      });
+
+      function createSessionCookieToken(payload: Record<string, unknown>): string {
+        const header = {
+          alg: 'RS256',
+          kid: TEST_KID,
+          typ: 'JWT',
+        };
+        
+        const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+        const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+        const signature = btoa('mock-signature').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+        
+        return `${encodedHeader}.${encodedPayload}.${signature}`;
+      }
+
+      it('should verify valid session cookie', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const mockPayload = {
+          sub: 'user123',
+          aud: TEST_PROJECT_ID,
+          iss: `https://session.firebase.google.com/${TEST_PROJECT_ID}`,
+          iat: now,
+          exp: now + 3600,
+          auth_time: now,
+          email: 'test@example.com',
+          email_verified: true,
+        };
+
+        const mockJwt = createSessionCookieToken(mockPayload);
+
+        // Mock public key fetch
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ [TEST_KID]: 'mock-public-key-pem' }),
+          headers: new Headers({ 'cache-control': 'max-age=3600' }),
+        });
+
+        const decoded = await verifySessionCookie(mockJwt);
+
+        expect(decoded.uid).toBe('user123');
+        expect(decoded.email).toBe('test@example.com');
+      });
+
+      it('should reject expired session cookie', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const expiredPayload = {
+          sub: 'user123',
+          aud: TEST_PROJECT_ID,
+          iss: `https://session.firebase.google.com/${TEST_PROJECT_ID}`,
+          iat: now - 7200,
+          exp: now - 3600, // Expired 1 hour ago
+          auth_time: now - 7200,
+        };
+
+        const expiredJwt = createSessionCookieToken(expiredPayload);
+
+        await expect(
+          verifySessionCookie(expiredJwt)
+        ).rejects.toThrow('expired');
+      });
+
+      it('should reject session cookie with wrong issuer', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const wrongIssuer = {
+          sub: 'user123',
+          aud: TEST_PROJECT_ID,
+          iss: `https://securetoken.google.com/${TEST_PROJECT_ID}`, // ID token issuer
+          iat: now,
+          exp: now + 3600,
+          auth_time: now,
+        };
+
+        const jwt = createSessionCookieToken(wrongIssuer);
+
+        await expect(
+          verifySessionCookie(jwt)
+        ).rejects.toThrow('incorrect issuer');
+      });
+
+      it('should reject session cookie with wrong audience', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const wrongAudience = {
+          sub: 'user123',
+          aud: 'wrong-project',
+          iss: `https://session.firebase.google.com/${TEST_PROJECT_ID}`,
+          iat: now,
+          exp: now + 3600,
+          auth_time: now,
+        };
+
+        const jwt = createSessionCookieToken(wrongAudience);
+
+        await expect(
+          verifySessionCookie(jwt)
+        ).rejects.toThrow('incorrect audience');
+      });
+
+      it('should reject invalid session cookie format', async () => {
+        
+        
+        await expect(
+          verifySessionCookie('invalid.format')
+        ).rejects.toThrow('Invalid session cookie format');
+      });
+
+      it('should reject empty session cookie', async () => {
+        
+        
+        await expect(
+          verifySessionCookie('')
+        ).rejects.toThrow('non-empty string');
+      });
+
+      it('should reject session cookie without subject', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const noSubject = {
+          aud: TEST_PROJECT_ID,
+          iss: `https://session.firebase.google.com/${TEST_PROJECT_ID}`,
+          iat: now,
+          exp: now + 3600,
+          auth_time: now,
+        };
+
+        const jwt = createSessionCookieToken(noSubject);
+
+        await expect(
+          verifySessionCookie(jwt)
+        ).rejects.toThrow('no subject');
+      });
+
+      it('should handle checkRevoked parameter', async () => {
+        
+        
+        const now = Math.floor(Date.now() / 1000);
+        const mockPayload = {
+          sub: 'user123',
+          aud: TEST_PROJECT_ID,
+          iss: `https://session.firebase.google.com/${TEST_PROJECT_ID}`,
+          iat: now,
+          exp: now + 3600,
+          auth_time: now,
+        };
+
+        const mockJwt = createSessionCookieToken(mockPayload);
+
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ [TEST_KID]: 'mock-public-key-pem' }),
+          headers: new Headers({ 'cache-control': 'max-age=3600' }),
+        });
+
+        // Should not throw even with checkRevoked=true (not yet implemented)
+        const decoded = await verifySessionCookie(mockJwt, true);
+        expect(decoded.uid).toBe('user123');
+      });
     });
   });
 

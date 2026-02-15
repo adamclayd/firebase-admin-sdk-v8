@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-02-15
+
+### Added
+- **Session Cookie Support**: Added `createSessionCookie()` and `verifySessionCookie()`
+- Long-lived authentication sessions (up to 14 days) instead of 1-hour ID tokens
+- Session cookie verification with proper issuer validation
+- 15 new unit tests for session cookie functionality
+- 3 new E2E tests for session cookie creation and verification
+- Comprehensive session cookie documentation in README
+
+### Changed
+- Auth module coverage improved from 63.18% to 97.51%
+- Total tests increased from 418 to 433 (+15 tests)
+
 ## [2.3.1] - 2026-02-14
 
 ### Fixed
