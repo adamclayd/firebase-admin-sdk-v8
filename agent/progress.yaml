@@ -777,6 +777,27 @@ notes: |
   - Focus on public API functions
 
 recent_work:
+  - date: 2026-02-18
+    description: Fixed session cookie verification bug and enabled E2E tests
+    items:
+      - ✅ Checked for ACP updates (up to date at v1.0.3)
+      - ✅ Read all agent documentation (progress.yaml, architecture.md, comparison.md)
+      - ✅ Read README.md, CHANGELOG.md, package.json
+      - ✅ Reviewed project structure and key source files
+      - ✅ Ran unit tests - 433 tests passing (15 test suites)
+      - ✅ Verified test coverage: 94.77% overall
+      - 🐛 FIXED: Session cookie verification bug (separate key caches)
+      - 🐛 FIXED: E2E tests not loading .env file (added --env-file flag)
+      - ✅ Updated package.json to use Node's --env-file flag
+      - ✅ Fixed public key caching to separate ID tokens and session cookies
+      - ✅ All 433 unit tests passing
+      - ✅ All 108 E2E tests passing (3 skipped - no API key needed)
+      - ✅ Session cookie E2E tests now working (3 tests passing)
+      - 📊 Project Status: Production-ready v2.4.0 with working session cookies
+      - 📊 Test Coverage: 94.77% (433 unit + 108 E2E tests)
+      - 🎯 Session cookies fully functional and tested
+      - ⚠️  Security audit findings still pending (6 high/critical issues)
+  
   - date: 2026-02-14
     description: ACP initialization and CRITICAL signed URL fix deployed
     items:

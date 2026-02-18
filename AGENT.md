@@ -1,9 +1,9 @@
 # Agent Context Protocol (ACP)
 
-**Also Known As**: The Agent Directory Pattern  
-**Version**: 1.0.3
-**Created**: 2026-02-11  
-**Status**: Production Pattern  
+**Also Known As**: The Agent Directory Pattern
+**Version**: 1.4.3
+**Created**: 2026-02-11
+**Status**: Production Pattern
 
 ---
 
@@ -81,6 +81,14 @@ ACP solves these by:
 project-root/
 ├── AGENT.md                        # This file - ACP documentation
 ├── agent/                          # Agent directory (ACP structure)
+│   ├── commands/                   # Command system
+│   │   ├── .gitkeep
+│   │   ├── command.template.md     # Command template
+│   │   ├── acp.init.md             # @acp-init
+│   │   ├── acp.proceed.md          # @acp-proceed
+│   │   ├── acp.status.md           # @acp-status
+│   │   └── ...                     # More commands
+│   │
 │   ├── design/                     # Design documents
 │   │   ├── .gitkeep
 │   │   ├── requirements.md         # Core requirements
@@ -551,6 +559,91 @@ The Agent Pattern represents a **paradigm shift** in how we approach AI-assisted
 
 ---
 
+## ACP Commands
+
+ACP supports a command system for common workflows. Commands are file-based triggers that provide standardized, discoverable interfaces for ACP operations.
+
+### What are ACP Commands?
+
+Commands are markdown files in [`agent/commands/`](agent/commands/) that contain step-by-step instructions for AI agents. Instead of typing long prompts like "AGENT.md: Initialize", you can reference command files like `@acp.init` to trigger specific workflows.
+
+**Benefits**:
+- **Discoverable**: Browse [`agent/commands/`](agent/commands/) to see all available commands
+- **Consistent**: All commands follow the same structure
+- **Extensible**: Create custom commands for your project
+- **Self-Documenting**: Each command file contains complete documentation
+- **Autocomplete-Friendly**: Type `@acp.` to see all ACP commands
+
+### Core Commands
+
+Core ACP commands use the `acp.` prefix and are available in [`agent/commands/`](agent/commands/):
+
+- **[`@acp.init`](agent/commands/acp.init.md)** - Initialize agent context (replaces "AGENT.md: Initialize")
+- **[`@acp.proceed`](agent/commands/acp.proceed.md)** - Continue with next task (replaces "AGENT.md: Proceed")
+- **[`@acp.status`](agent/commands/acp.status.md)** - Display project status
+- **[`@acp.version-check`](agent/commands/acp.version-check.md)** - Show current ACP version
+- **[`@acp.version-check-for-updates`](agent/commands/acp.version-check-for-updates.md)** - Check for ACP updates
+- **[`@acp.version-update`](agent/commands/acp.version-update.md)** - Update ACP to latest version
+
+### Command Invocation
+
+Commands are invoked using the `@` syntax with dot notation:
+
+```
+@acp.init                    → agent/commands/acp.init.md
+@acp.proceed                 → agent/commands/acp.proceed.md
+@acp.status                  → agent/commands/acp.status.md
+@deploy.production           → agent/commands/deploy.production.md
+```
+
+**Format**: `@{namespace}.{action}` resolves to `agent/commands/{namespace}.{action}.md`
+
+### Creating Custom Commands
+
+To create custom commands for your project:
+
+1. **Choose a namespace** (e.g., `deploy`, `test`, `custom`)
+   - ⚠️ The `acp` namespace is reserved for core commands
+   - Use descriptive, single-word namespaces
+
+2. **Copy the command template**:
+   ```bash
+   cp agent/commands/command.template.md agent/commands/{namespace}.{action}.md
+   ```
+
+3. **Fill in the template sections**:
+   - Purpose and description
+   - Prerequisites
+   - Step-by-step instructions
+   - Verification checklist
+   - Examples and troubleshooting
+
+4. **Invoke your command**: `@{namespace}.{action}`
+
+**Example**: Creating a deployment command:
+```bash
+# Create the command file
+cp agent/commands/command.template.md agent/commands/deploy.production.md
+
+# Edit the file with your deployment steps
+# ...
+
+# Invoke it
+@deploy.production
+```
+
+### Command Template
+
+See [`agent/commands/command.template.md`](agent/commands/command.template.md) for the complete command template with all sections and examples.
+
+### Installing Third-Party Commands
+
+Use `@acp.install` to install command packages from git repositories (available in future release).
+
+**Security Note**: Third-party commands can instruct agents to modify files and execute scripts. Always review command files before installation.
+
+---
+
 ## Sample Prompts for Using ACP
 
 ### Initialize Prompt
@@ -782,7 +875,17 @@ Run ./agent/scripts/uninstall.sh to remove all ACP files (agent/ directory and A
    - Update percentages
    - Add recent work notes
 
-7. **NEVER handle secrets or sensitive data**
+7. **CRITICAL: Always update CHANGELOG.md for version changes**
+   - ❌ **DO NOT** commit version changes without updating CHANGELOG.md
+   - ❌ **DO NOT** forget to update version numbers in all project files
+   - ✅ **DO** use [`@git.commit`](agent/commands/git.commit.md) for version-aware commits
+   - ✅ **DO** detect version impact: major (breaking), minor (features), patch (fixes)
+   - ✅ **DO** update CHANGELOG.md with clear, user-focused descriptions
+   - ✅ **DO** update all version files (package.json, AGENT.md, etc.)
+   - ✅ **DO** use Conventional Commits format for commit messages
+   - **Rationale**: CHANGELOG.md is the primary communication tool for users. Every version change must be documented with clear descriptions of what changed, why it changed, and how it affects users. Forgetting to update CHANGELOG.md breaks the project's version history and makes it impossible for users to understand what changed between versions.
+
+8. **NEVER handle secrets or sensitive data**
    - ❌ **DO NOT** read `.env` files, `.env.local`, or any environment files
    - ❌ **DO NOT** read files containing API keys, tokens, passwords, or credentials
    - ❌ **DO NOT** include secrets in messages, documentation, or code examples
@@ -792,6 +895,14 @@ Run ./agent/scripts/uninstall.sh to remove all ACP files (agent/ directory and A
    - ✅ **DO** reference environment variable names without reading their values
    - ✅ **DO** create `.env.example` files with placeholder values only
    - **Rationale**: Secrets must never be exposed in chat logs, documentation, or version control. Agents should treat all credential files as off-limits to prevent accidental exposure.
+
+9. **CRITICAL: Respect user's intentional file edits**
+   - ❌ **DO NOT** assume missing content needs to be added back
+   - ❌ **DO NOT** revert changes without confirming with user
+   - ✅ **DO** read files before editing to see current state
+   - ✅ **DO** ask user if unexpected changes were intentional
+   - ✅ **DO** confirm before reverting user's manual edits
+   - **Rationale**: If you read a file and it is missing contents or has changed contents (i.e., it does not contain what you expect), assume or confirm with the user if they made intentional updates that you should not revert. Do not assume "The file is missing <xyz>, I need to add it back". The user may have edited files manually with intention.
 
 ---
 
@@ -882,7 +993,7 @@ This repository is actively maintained with improvements to the ACP methodology 
 ./agent/scripts/update.sh
 
 # Or download and run directly
-curl -fsSL https://raw.githubusercontent.com/prmichaelsen/agent-context-protocol/mainlin./agent/scripts/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/prmichaelsen/agent-context-protocol/mainline/agent/scripts/update.sh | bash
 ```
 
 The update script will:
