@@ -1,6 +1,6 @@
 {
   "name": "@prmichaelsen/firebase-admin-sdk-v8",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
