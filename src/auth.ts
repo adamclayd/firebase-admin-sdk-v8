@@ -35,18 +35,22 @@ interface JWTHeader {
 }
 
 /**
- * Cache for Google's public keys
+ * Cache for Google's public keys (separate caches for ID tokens and session cookies)
  */
-let publicKeysCache: Record<string, string> | null = null;
-let publicKeysCacheExpiry: number = 0;
+let idTokenKeysCache: Record<string, string> | null = null;
+let idTokenKeysCacheExpiry: number = 0;
+let sessionKeysCache: Record<string, string> | null = null;
+let sessionKeysCacheExpiry: number = 0;
 
 /**
  * Clear the public keys cache (for testing)
  * @internal
  */
 export function clearPublicKeysCache(): void {
-  publicKeysCache = null;
-  publicKeysCacheExpiry = 0;
+  idTokenKeysCache = null;
+  idTokenKeysCacheExpiry = 0;
+  sessionKeysCache = null;
+  sessionKeysCacheExpiry = 0;
 }
 
 /**
@@ -55,16 +59,25 @@ export function clearPublicKeysCache(): void {
  */
 async function fetchPublicKeys(issuer?: string): Promise<Record<string, string>> {
   // Determine which endpoint to use based on issuer
-  let endpoint = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+  const isSessionCookie = issuer && issuer.includes('session.firebase.google.com');
   
-  // For Firebase v10 session tokens, use the session endpoint
-  if (issuer && issuer.includes('session.firebase.google.com')) {
+  let endpoint: string;
+  let cache: Record<string, string> | null;
+  let cacheExpiry: number;
+  
+  if (isSessionCookie) {
     endpoint = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys';
+    cache = sessionKeysCache;
+    cacheExpiry = sessionKeysCacheExpiry;
+  } else {
+    endpoint = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+    cache = idTokenKeysCache;
+    cacheExpiry = idTokenKeysCacheExpiry;
   }
   
   // Return cached keys if still valid
-  if (publicKeysCache && Date.now() < publicKeysCacheExpiry) {
-    return publicKeysCache;
+  if (cache && Date.now() < cacheExpiry) {
+    return cache;
   }
 
   const response = await fetch(endpoint);
@@ -73,12 +86,20 @@ async function fetchPublicKeys(issuer?: string): Promise<Record<string, string>>
     throw new Error(`Failed to fetch Firebase public keys from ${endpoint}`);
   }
 
-  publicKeysCache = await response.json();
+  const keys = await response.json();
   
   // Cache for 1 hour (keys rotate every 24 hours)
-  publicKeysCacheExpiry = Date.now() + 3600000;
+  const newExpiry = Date.now() + 3600000;
   
-  return publicKeysCache!;
+  if (isSessionCookie) {
+    sessionKeysCache = keys;
+    sessionKeysCacheExpiry = newExpiry;
+  } else {
+    idTokenKeysCache = keys;
+    idTokenKeysCacheExpiry = newExpiry;
+  }
+  
+  return keys;
 }
 
 /**
@@ -210,8 +231,15 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
 
     // If key not found, it might have rotated - clear cache and retry once
     if (!publicKeyPem) {
-      publicKeysCache = null;
-      publicKeysCacheExpiry = 0;
+      // Clear the appropriate cache based on issuer
+      const isSessionCookie = payload.iss && payload.iss.includes('session.firebase.google.com');
+      if (isSessionCookie) {
+        sessionKeysCache = null;
+        sessionKeysCacheExpiry = 0;
+      } else {
+        idTokenKeysCache = null;
+        idTokenKeysCacheExpiry = 0;
+      }
       
       publicKeys = await fetchPublicKeys(payload.iss);
       publicKeyPem = publicKeys[header.kid];

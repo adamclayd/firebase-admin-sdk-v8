@@ -26,8 +26,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "jest --config jest.e2e.config.js",
-    "test:e2e:watch": "jest --config jest.e2e.config.js --watch",
+    "test:e2e": "node --env-file=.env node_modules/.bin/jest --config jest.e2e.config.js",
+    "test:e2e:watch": "node --env-file=.env node_modules/.bin/jest --config jest.e2e.config.js --watch",
     "test:all": "npm test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
