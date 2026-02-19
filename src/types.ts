@@ -237,3 +237,82 @@ export interface BatchWriteResult {
     updateTime: string;
   }>;
 }
+
+/**
+ * Firebase user record
+ */
+export interface UserRecord {
+  /** User's unique ID */
+  uid: string;
+  /** User's email address */
+  email?: string;
+  /** Whether the email is verified */
+  emailVerified: boolean;
+  /** User's display name */
+  displayName?: string;
+  /** User's photo URL */
+  photoURL?: string;
+  /** User's phone number */
+  phoneNumber?: string;
+  /** Whether the user is disabled */
+  disabled: boolean;
+  /** User metadata (creation and last sign-in times) */
+  metadata: {
+    creationTime: string;
+    lastSignInTime: string;
+  };
+  /** Provider-specific user information */
+  providerData: UserInfo[];
+  /** Custom claims set on the user */
+  customClaims?: Record<string, any>;
+}
+
+/**
+ * Request to create a new user
+ */
+export interface CreateUserRequest {
+  /** User's email address */
+  email?: string;
+  /** Whether the email should be marked as verified */
+  emailVerified?: boolean;
+  /** User's phone number */
+  phoneNumber?: string;
+  /** User's password */
+  password?: string;
+  /** User's display name */
+  displayName?: string;
+  /** User's photo URL */
+  photoURL?: string;
+  /** Whether the user should be disabled */
+  disabled?: boolean;
+}
+
+/**
+ * Request to update an existing user
+ */
+export interface UpdateUserRequest {
+  /** User's email address */
+  email?: string;
+  /** Whether the email should be marked as verified */
+  emailVerified?: boolean;
+  /** User's phone number */
+  phoneNumber?: string;
+  /** User's password */
+  password?: string;
+  /** User's display name */
+  displayName?: string;
+  /** User's photo URL */
+  photoURL?: string;
+  /** Whether the user should be disabled */
+  disabled?: boolean;
+}
+
+/**
+ * Result of listing users
+ */
+export interface ListUsersResult {
+  /** Array of user records */
+  users: UserRecord[];
+  /** Token for fetching the next page (if available) */
+  pageToken?: string;
+}

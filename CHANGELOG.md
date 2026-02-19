@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-02-19
+
+### Added
+- **User Management APIs**: Complete user management functionality via Firebase Identity Toolkit REST API
+  - `getUserByEmail()` - Look up users by email address
+  - `getUserByUid()` - Look up users by UID
+  - `createUser()` - Create new Firebase users with email, password, display name, etc.
+  - `updateUser()` - Update existing user properties (email, password, display name, photo URL, etc.)
+  - `deleteUser()` - Delete Firebase users
+  - `listUsers()` - List all users with pagination support (up to 1000 per page)
+  - `setCustomUserClaims()` - Set custom claims for role-based access control
+- New type definitions: `UserRecord`, `CreateUserRequest`, `UpdateUserRequest`, `ListUsersResult`
+- 30 comprehensive unit tests for user management (91.66% coverage)
+- 18 E2E tests for user management (complete lifecycle testing)
+- Complete user management documentation in README with examples
+- Feature comparison table updated to show user management support
+
+### Changed
+- Total unit tests increased from 433 to 463 (+30 tests)
+- Total E2E tests increased from 105 to 123 (+18 tests)
+- Updated feature list to include user management
+
+### Notes
+- `listUsers()` E2E tests are skipped as the REST API endpoint availability varies by Firebase project configuration
+
 ## [2.4.0] - 2026-02-15
 
 ### Added

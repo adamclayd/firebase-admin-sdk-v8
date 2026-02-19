@@ -18,6 +18,17 @@ export {
 } from './auth';
 export type { CustomClaims, CustomTokenSignInResponse, SessionCookieOptions } from './auth';
 
+// User Management exports
+export {
+  getUserByEmail,
+  getUserByUid,
+  createUser,
+  updateUser,
+  deleteUser,
+  listUsers,
+  setCustomUserClaims,
+} from './user-management';
+
 // Firestore exports
 export {
   setDocument,
@@ -73,6 +84,10 @@ export type {
   QueryOptions,
   BatchWrite,
   BatchWriteResult,
+  UserRecord,
+  CreateUserRequest,
+  UpdateUserRequest,
+  ListUsersResult,
 } from './types';
 
 // Storage type exports

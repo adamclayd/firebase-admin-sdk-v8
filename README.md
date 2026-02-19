@@ -16,6 +16,7 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 - ✅ **JWT Token Generation** - Service account authentication
 - ✅ **ID Token Verification** - Verify Firebase ID tokens (supports v9 and v10 formats)
 - ✅ **Session Cookies** - Create and verify long-lived session cookies (up to 14 days)
+- ✅ **User Management** - Create, read, update, delete users via Admin API
 - ✅ **Firebase v10 Compatible** - Supports both old and new token issuer formats
 - ✅ **Firestore REST API** - Full CRUD operations via REST
 - ✅ **Field Value Operations** - increment, arrayUnion, arrayRemove, serverTimestamp, delete
@@ -171,6 +172,97 @@ Get user information from a verified ID token.
 ```typescript
 const user = await getUserFromToken(idToken);
 // Returns: { uid, email, emailVerified, displayName, photoURL }
+```
+
+### User Management
+
+#### `getUserByEmail(email: string): Promise<UserRecord | null>`
+
+Look up a Firebase user by email address.
+
+```typescript
+const user = await getUserByEmail('user@example.com');
+if (user) {
+  console.log('User ID:', user.uid);
+  console.log('Email verified:', user.emailVerified);
+}
+```
+
+#### `getUserByUid(uid: string): Promise<UserRecord | null>`
+
+Look up a Firebase user by UID.
+
+```typescript
+const user = await getUserByUid('user123');
+if (user) {
+  console.log('Email:', user.email);
+  console.log('Display name:', user.displayName);
+}
+```
+
+#### `createUser(properties: CreateUserRequest): Promise<UserRecord>`
+
+Create a new Firebase user.
+
+```typescript
+const newUser = await createUser({
+  email: 'newuser@example.com',
+  password: 'securePassword123',
+  displayName: 'New User',
+  emailVerified: false,
+});
+console.log('Created user:', newUser.uid);
+```
+
+#### `updateUser(uid: string, properties: UpdateUserRequest): Promise<UserRecord>`
+
+Update an existing Firebase user.
+
+```typescript
+const updatedUser = await updateUser('user123', {
+  displayName: 'Updated Name',
+  photoURL: 'https://example.com/photo.jpg',
+  emailVerified: true,
+});
+```
+
+#### `deleteUser(uid: string): Promise<void>`
+
+Delete a Firebase user.
+
+```typescript
+await deleteUser('user123');
+```
+
+#### `listUsers(maxResults?: number, pageToken?: string): Promise<ListUsersResult>`
+
+List all users with pagination.
+
+```typescript
+// List first 100 users
+const result = await listUsers(100);
+console.log('Users:', result.users.length);
+
+// Get next page
+if (result.pageToken) {
+  const nextPage = await listUsers(100, result.pageToken);
+}
+```
+
+#### `setCustomUserClaims(uid: string, customClaims: Record<string, any> | null): Promise<void>`
+
+Set custom claims on a user's ID token for role-based access control.
+
+```typescript
+// Set custom claims
+await setCustomUserClaims('user123', {
+  role: 'admin',
+  premium: true,
+  permissions: ['read', 'write', 'delete'],
+});
+
+// Clear custom claims
+await setCustomUserClaims('user123', null);
 ```
 
 ### Firestore - Basic Operations
@@ -619,7 +711,7 @@ For better query performance:
 | ID Token Verification | ✅ | Supports v9 and v10 token formats |
 | Custom Token Creation | ✅ | createCustomToken() |
 | Custom Token Exchange | ✅ | signInWithCustomToken() |
-| User Management | ❌ | Not yet implemented |
+| User Management | ✅ | Create, read, update, delete, list users |
 | Firestore CRUD | ✅ | Full support |
 | Firestore Queries | ✅ | where, orderBy, limit, cursors |
 | Firestore Batch | ✅ | Up to 500 operations |
