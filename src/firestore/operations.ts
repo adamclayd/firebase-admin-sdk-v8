@@ -112,7 +112,8 @@ export async function setDocument(
     const nonTransformFields = Object.keys(cleanData);
     if (nonTransformFields.length > 0) {
       if (options?.merge) {
-        updateWrite.updateMask = { fieldPaths: ['*'] };
+        // For merge: true, include all non-transform fields in the mask
+        updateWrite.updateMask = { fieldPaths: nonTransformFields };
       } else if (options?.mergeFields && options.mergeFields.length > 0) {
         updateWrite.updateMask = { fieldPaths: options.mergeFields };
       } else {
@@ -131,7 +132,12 @@ export async function setDocument(
   let queryParams = '';
   
   if (options?.merge) {
-    queryParams = '?updateMask.fieldPaths=*';
+    // For merge: true, include all fields in the updateMask
+    const allFields = Object.keys(cleanData);
+    if (allFields.length > 0) {
+      const fieldPaths = allFields.join('&updateMask.fieldPaths=');
+      queryParams = `?updateMask.fieldPaths=${fieldPaths}`;
+    }
   } else if (options?.mergeFields && options.mergeFields.length > 0) {
     const fieldPaths = options.mergeFields.join('&updateMask.fieldPaths=');
     queryParams = `?updateMask.fieldPaths=${fieldPaths}`;
@@ -534,7 +540,11 @@ export async function batchWrite(operations: BatchWrite[]): Promise<BatchWriteRe
         };
         
         if (op.options?.merge) {
-          write.updateMask = { fieldPaths: ['*'] };
+          // For merge: true, include all non-transform fields in the mask
+          const nonTransformFields = Object.keys(cleanData);
+          if (nonTransformFields.length > 0) {
+            write.updateMask = { fieldPaths: nonTransformFields };
+          }
         } else if (op.options?.mergeFields) {
           write.updateMask = { fieldPaths: op.options.mergeFields };
         }

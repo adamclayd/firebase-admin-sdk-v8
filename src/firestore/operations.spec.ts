@@ -109,7 +109,7 @@ describe('Firestore Operations', () => {
       await setDocument('users', 'user123', { age: 31 }, { merge: true });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('updateMask.fieldPaths=*'),
+        expect.stringContaining('updateMask.fieldPaths=age'),
         expect.any(Object)
       );
     });
@@ -168,7 +168,7 @@ describe('Firestore Operations', () => {
       const callArgs = (global.fetch as jest.Mock).mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['*'] });
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
       expect(body.writes[0].updateTransforms).toBeDefined();
     });
 
@@ -824,7 +824,7 @@ describe('Firestore Operations', () => {
       const callArgs = (global.fetch as jest.Mock).mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['*'] });
+      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
     });
 
     it('should handle set with mergeFields option in batch', async () => {
