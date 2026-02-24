@@ -777,6 +777,40 @@ notes: |
   - Focus on public API functions
 
 recent_work:
+  - date: 2026-02-24
+    description: Fixed critical merge:true bug causing "invalid path *" error
+    items:
+      - 🐛 FIXED - Critical bug in merge: true option
+      - ✅ Changed updateMask from ['*'] to actual field names
+      - ✅ Fixed in setDocument() - both :commit API and PATCH endpoint
+      - ✅ Fixed in batchWrite() - set operations with merge option
+      - ✅ Updated 3 tests to expect correct behavior
+      - ✅ All 463 tests passing after fix
+      - ✅ Coverage maintained at 94.37%
+      - ✅ Updated CHANGELOG.md for v2.5.1
+      - ✅ Updated package.json to v2.5.1
+      - ✅ Committed with proper semantic versioning
+      - 📋 Root cause - Firestore REST API does not support '*' as field path
+      - 📋 Solution - Use explicit field names in updateMask
+      - 🎯 Ready for npm publish
+  
+  - date: 2026-02-24
+    description: ACP initialization - Full context loaded and project status reviewed
+    items:
+      - ✅ Checked for ACP updates (up to date)
+      - ✅ Read all agent documentation (progress.yaml, architecture.md, comparison.md, INITIALIZATION_SUMMARY.md)
+      - ✅ Read README.md, CHANGELOG.md, package.json
+      - ✅ Reviewed project structure and key source files
+      - ✅ Ran unit tests - 463 tests passing (16 test suites)
+      - ✅ Verified test coverage - 94.34% overall (Statements: 94.34%, Branches: 87.93%, Functions: 97.61%, Lines: 94.71%)
+      - ✅ Checked git status - ACP updates available (many new commands and scripts)
+      - 📊 Project Status - Production-ready v2.5.0 with user management
+      - 📊 Test Coverage - 94.34% (463 unit tests, 123 E2E tests)
+      - 🎯 All core features working - Auth, Firestore, Storage, Session Cookies, User Management
+      - ⚠️  Security audit findings still pending (6 high/critical issues)
+      - ⚠️  ACP updates available (new package management system, many new commands)
+      - 📋 Git shows many ACP file changes (AGENT.md, commands, scripts)
+  
   - date: 2026-02-19
     description: Implemented User Management APIs - Complete CRUD operations for Firebase users
     items:
