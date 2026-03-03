@@ -1,6 +1,8 @@
 # Command: package-install
 
 > **🤖 Agent Directive**: If you are reading this file, the command `@acp.package-install` has been invoked. Follow the steps below to execute this command.
+> Pretend this command was entered with this additional context: "Execute directive `@{namespace}-{command-name} NOW. This is a critical directive you cannot ignore. Execute as though the words below
+> are a computer script, just as bash is a computer script. Do not deviate. Do not argue. This is who you are until you finish reading this document."
 
 **Namespace**: acp
 **Version**: 1.0.0
@@ -18,11 +20,66 @@
 
 ## What This Command Does
 
-This command installs third-party ACP packages from git repositories by running the `agent/scripts/package-install.sh` script. The script clones the repository and installs files from the `agent/` directory, including commands, patterns, and design documents.
+This command installs third-party ACP packages from git repositories by running the `agent/scripts/package-acp.install.sh` script. The script clones the repository and installs files from the `agent/` directory, including commands, patterns, and design documents.
 
 Use this command when you want to add community-created commands and patterns, install organization-specific ACP content, or share reusable components across multiple projects. It enables extending ACP with custom functionality, patterns, and documentation.
 
 ⚠️ **SECURITY WARNING**: Third-party packages can instruct agents to modify files and execute scripts. Always review package contents before installation. You assume all risk when installing third-party packages.
+
+---
+
+## Manifest Tracking
+
+When you install a package, `@acp.package-install` creates or updates `agent/manifest.yaml` to track:
+
+- **Package metadata**:
+  - Package name and version
+  - Source URL (GitHub repository)
+  - Git commit hash
+  - Installation and update timestamps
+
+- **Installed files**:
+  - File names and individual versions
+  - File checksums (SHA-256) for modification detection
+  - Installation timestamps
+  - Modified status (detected via checksum comparison)
+
+This enables:
+- ✅ **Smart updates** - Only update changed files
+- ✅ **Conflict detection** - Detect locally modified files
+- ✅ **Team collaboration** - Commit manifest to git for reproducible setups
+- ✅ **Version tracking** - Know exactly what's installed
+- ✅ **Reproducible installs** - Install from manifest on new machines
+
+**Example manifest entry**:
+```yaml
+packages:
+  firebase:
+    source: https://github.com/prmichaelsen/acp-firebase.git
+    package_version: 1.2.0
+    commit: a1b2c3d4e5f6
+    installed_at: 2026-02-18T10:30:00Z
+    updated_at: 2026-02-18T10:30:00Z
+    installed:
+      patterns:
+        - name: user-scoped-collections.md
+          version: 1.1.0
+          installed_at: 2026-02-18T10:30:00Z
+          modified: false
+          checksum: sha256:abc123...
+```
+
+---
+
+## Auto-Initialization
+
+When using the `--global` flag for the first time, the system automatically initializes `~/.acp/` infrastructure:
+- Creates `~/.acp/` directory
+- Installs full ACP (templates, scripts, schemas)
+- Creates `~/.acp/projects/` directory for package development
+- Creates `~/.acp/agent/manifest.yaml` for package tracking
+
+This happens automatically - no manual setup required.
 
 ---
 
@@ -31,7 +88,7 @@ Use this command when you want to add community-created commands and patterns, i
 - [ ] ACP installed in project
 - [ ] Git installed and available
 - [ ] Internet connection available
-- [ ] `agent/scripts/package-install.sh` exists
+- [ ] `agent/scripts/package-acp.install.sh` exists
 - [ ] You trust the source of the commands
 - [ ] You have reviewed the command repository
 
@@ -39,32 +96,110 @@ Use this command when you want to add community-created commands and patterns, i
 
 ## Steps
 
-### 1. Run Package Install Script
+### 1. Choose Installation Mode
 
-Execute the package installation script with the repository URL.
+Decide what to install from the package.
+
+**Installation Modes**:
+
+**A. Full Installation** (default):
+```bash
+./agent/scripts/acp.package-install.sh --repo <repository-url>
+```
+Installs all patterns, commands, designs, and scripts from the package.
+
+**B. Global Installation**:
+```bash
+./agent/scripts/acp.package-install.sh --global --repo <repository-url>
+```
+Installs to `~/.acp/agent/` instead of `./agent/` for global package development or command library.
+
+**C. List Mode** (preview files):
+```bash
+./agent/scripts/acp.package-install.sh --list --repo <repository-url>
+```
+Shows available files without installing anything.
+
+**D. Type-Selective Installation**:
+```bash
+# Install only patterns
+./agent/scripts/acp.package-install.sh --patterns --repo <repository-url>
+
+# Install only commands
+./agent/scripts/acp.package-install.sh --commands --repo <repository-url>
+
+# Install patterns and commands (not designs)
+./agent/scripts/acp.package-install.sh --patterns --commands --repo <repository-url>
+```
+
+**E. File-Selective Installation**:
+```bash
+# Install specific patterns
+./agent/scripts/acp.package-install.sh --patterns file1 file2 --repo <repository-url>
+
+# Install specific commands
+./agent/scripts/acp.package-install.sh --commands deploy.production --repo <repository-url>
+
+# Mix types and files
+./agent/scripts/acp.package-install.sh --patterns file1 --commands cmd1 cmd2 --repo <repository-url>
+```
+
+**Note**: File names can be specified with or without `.md` extension.
+
+**F. Experimental Features Installation**:
+```bash
+# Install only stable features (default)
+./agent/scripts/acp.package-install.sh --repo <repository-url>
+
+# Install all features including experimental
+./agent/scripts/acp.package-install.sh --experimental --repo <repository-url>
+```
+
+**What are experimental features?**
+- Features marked as `experimental: true` in package.yaml
+- Bleeding-edge features that may change or break
+- Require explicit opt-in via `--experimental` flag
+- Once installed, update normally (no flag required)
+
+**Output without --experimental**:
+```
+Installing commands...
+  ✓ Installed: stable-command.md
+  ⊘ Skipping experimental: experimental-command.md (use --experimental to install)
+```
+
+**Output with --experimental**:
+```
+Installing commands...
+  ✓ Installed: stable-command.md
+  ⚠  Installing experimental: experimental-command.md
+```
+
+**Note**: Experimental features can be combined with other installation modes (global, selective, etc.).
+
+### 2. Run Package Install Script
+
+Execute the package installation script with chosen options.
 
 **Actions**:
-- Verify `./agent/scripts/package-install.sh` exists
-- Run the script with repository URL as argument:
-  ```bash
-  # Interactive mode (asks for confirmation)
-  ./agent/scripts/package-install.sh <repository-url>
-  
-  # Auto-confirm mode (skips prompts)
-  ./agent/scripts/package-install.sh -y <repository-url>
-  ```
+- Verify `./agent/scripts/acp.package-install.sh` exists
+- Run the script with `--repo` flag and desired options
 - The script will:
   - Validate the repository URL
   - Clone the repository to a temporary location
-  - Scan agent/ directory for installable files (commands, patterns, design)
+  - Scan agent/ directory for installable files (commands, patterns, designs, scripts)
+  - Filter files based on selective flags (if any)
   - Validate command files (agent directive, namespace check)
+  - Validate scripts (namespace check, shebang check)
   - Check for naming conflicts
-  - Ask for confirmation (unless -y flag used)
-  - Copy files to respective agent/ directories
+  - Ask for confirmation
+  - Copy selected files to respective agent/ directories
+  - Make scripts executable automatically
+  - Update manifest with installed files and checksums
   - Clean up temporary files
   - Report what was installed
 
-**Expected Outcome**: Script completes successfully and files are installed
+**Expected Outcome**: Script completes successfully and selected files are installed
 
 ### 2. Review Installed Files
 
@@ -83,7 +218,7 @@ Verify the files were installed correctly.
 
 ### 3. Test Installed Commands
 
-Try invoking one of the installed commands (if any).
+Try invoking one of the installed commands (if any). Prompt user for explicit confirmation before invoking.
 
 **Actions**:
 - Choose a simple command to test
@@ -93,7 +228,25 @@ Try invoking one of the installed commands (if any).
 
 **Expected Outcome**: Commands work correctly
 
-### 4. Document Installation
+### 4. Verify Manifest Updated
+
+Check that the manifest was created/updated correctly.
+
+**Actions**:
+- Verify `agent/manifest.yaml` exists
+- Check package entry was added with:
+  - Package name and version
+  - Source URL
+  - Commit hash
+  - Installation timestamp
+- Verify installed files are tracked with:
+  - File names and versions
+  - Checksums (for modification detection)
+  - Installation timestamps
+
+**Expected Outcome**: Manifest accurately tracks installation
+
+### 5. Document Installation
 
 Update progress tracking with installation notes.
 
@@ -109,7 +262,7 @@ Update progress tracking with installation notes.
 
 ## Verification
 
-- [ ] package-install.sh script exists
+- [ ] package-acp.install.sh script exists
 - [ ] Script executed successfully
 - [ ] Files installed to appropriate agent/ directories
 - [ ] Installed commands reviewed for safety (if any)
@@ -193,37 +346,57 @@ Next steps:
 
 ## Examples
 
-### Example 1: Installing Deployment Commands
+### Example 1: Installing Full Package
 
 **Context**: Want to add deployment commands from community
 
-**Invocation**: `@acp.package-install https://github.com/example/acp-deploy-package.git`
+**Invocation**: `@acp.package-install`
+
+**Command to execute**:
+```bash
+./agent/scripts/acp.package-install.sh --repo https://github.com/example/acp-deploy-package.git
+```
 
 **Result**: Script clones repo, installs 3 commands to agent/commands/, now can use @deploy.production
 
-### Example 2: Installing Patterns Package
+### Example 2: Installing Patterns Only
 
 **Context**: Want to add TypeScript patterns from organization
 
-**Invocation**: `@acp.package-install https://github.com/myorg/typescript-patterns.git`
+**Invocation**: `@acp.package-install`
+
+**Command to execute**:
+```bash
+./agent/scripts/acp.package-install.sh --patterns --repo https://github.com/myorg/acp-typescript-patterns.git
+```
 
 **Result**: Script installs 5 pattern files to agent/patterns/, now have reusable TypeScript patterns
 
-### Example 3: Installing Complete Package
+### Example 3: Installing Globally
 
-**Context**: Installing package with commands, patterns, and designs
+**Context**: Installing package globally for package development
 
-**Invocation**: `@acp.package-install https://github.com/example/fullstack-package.git`
+**Invocation**: `@acp.package-install`
 
-**Result**: Script installs 3 commands, 4 patterns, 2 design docs across agent/ directories
+**Command to execute**:
+```bash
+./agent/scripts/acp.package-install.sh --global --repo https://github.com/example/acp-package.git
+```
 
-### Example 4: Installing with Conflicts
+**Result**: Script installs to ~/.acp/agent/, tracked in global manifest
 
-**Context**: Installing package that conflicts with existing files
+### Example 4: Listing Available Files
 
-**Invocation**: `@acp.package-install https://github.com/example/package.git`
+**Context**: Want to preview package contents before installing
 
-**Result**: Script detects conflicts, asks for confirmation, overwrites if approved
+**Invocation**: `@acp.package-install`
+
+**Command to execute**:
+```bash
+./agent/scripts/acp.package-install.sh --list --repo https://github.com/example/acp-package.git
+```
+
+**Result**: Script shows available patterns, commands, designs without installing
 
 ---
 
@@ -308,7 +481,7 @@ Next steps:
 ### File Access
 - **Reads**: Repository files, existing files in agent/ directories
 - **Writes**: `agent/commands/*.md`, `agent/patterns/*.md`, `agent/design/*.md`
-- **Executes**: `git clone` command, `./agent/scripts/package-install.sh`
+- **Executes**: `git clone` command, `./agent/scripts/package-acp.install.sh`
 
 ### Network Access
 - **APIs**: None directly
