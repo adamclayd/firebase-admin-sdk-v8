@@ -38,13 +38,36 @@ export function buildStructuredQuery(collectionPath: string, options?: QueryOpti
   };
 
   if (options?.where && options.where.length > 0) {
-    const filters = options.where.map((filter: QueryFilter) => ({
-      fieldFilter: {
-        field: { fieldPath: filter.field },
-        op: mapWhereOp(filter.op),
-        value: toFirestoreValue(filter.value),
-      },
-    }));
+    const filters = options.where.map((filter: QueryFilter) => {
+      // Use unaryFilter for null/undefined comparisons with ==
+      if ((filter.value === null || filter.value === undefined) && filter.op === '==') {
+        return {
+          unaryFilter: {
+            field: { fieldPath: filter.field },
+            op: 'IS_NULL',
+          },
+        };
+      }
+
+      // Use unaryFilter for NaN comparisons
+      if (filter.value !== filter.value && filter.op === '==') { // NaN check
+        return {
+          unaryFilter: {
+            field: { fieldPath: filter.field },
+            op: 'IS_NAN',
+          },
+        };
+      }
+
+      // Regular fieldFilter for all other cases
+      return {
+        fieldFilter: {
+          field: { fieldPath: filter.field },
+          op: mapWhereOp(filter.op),
+          value: toFirestoreValue(filter.value),
+        },
+      };
+    });
 
     if (filters.length === 1) {
       query.where = filters[0];
