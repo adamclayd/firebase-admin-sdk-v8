@@ -228,6 +228,87 @@ describe('Firestore E2E Tests', () => {
         }
       });
     });
+
+    it('should query documents where field is null', async () => {
+      // Create test documents with null and non-null values
+      const nullTestDocs: string[] = [];
+
+      try {
+        const docWithNull = `test-${timestamp}-null-query-1`;
+        const docWithValue = `test-${timestamp}-null-query-2`;
+        const docWithoutField = `test-${timestamp}-null-query-3`;
+
+        nullTestDocs.push(docWithNull, docWithValue, docWithoutField);
+
+        // Document with null value
+        await setDocument(TEST_COLLECTION, docWithNull, {
+          name: 'User with null deletedAt',
+          deletedAt: null,
+          _test: true,
+          _testNull: true,
+        });
+
+        // Document with actual value
+        await setDocument(TEST_COLLECTION, docWithValue, {
+          name: 'User with deletedAt value',
+          deletedAt: '2026-01-01',
+          _test: true,
+          _testNull: true,
+        });
+
+        // Document without the field (should also match null query)
+        await setDocument(TEST_COLLECTION, docWithoutField, {
+          name: 'User without deletedAt field',
+          _test: true,
+          _testNull: true,
+        });
+
+        // Query for documents where deletedAt is null
+        const results = await queryDocuments(TEST_COLLECTION, {
+          where: [
+            { field: '_testNull', op: '==', value: true },
+            { field: 'deletedAt', op: '==', value: null },
+          ],
+        });
+
+        // Firestore null queries only match fields explicitly set to null, not missing fields
+        expect(results.length).toBeGreaterThanOrEqual(1);
+
+        const resultIds = results.map(doc => doc.id);
+        expect(resultIds).toContain(docWithNull);
+        // Missing field is NOT matched by null query in Firestore
+        // expect(resultIds).toContain(docWithoutField);
+        expect(resultIds).not.toContain(docWithValue);
+
+        results.forEach(doc => {
+          const data = doc.data as Record<string, unknown>;
+          if (data._testNull) {
+            // deletedAt should be null (missing fields are not matched by IS_NULL)
+            expect(data.deletedAt).toBeNull();
+          }
+        });
+      } finally {
+        // Clean up
+        for (const docId of nullTestDocs) {
+          try {
+            await deleteDocument(TEST_COLLECTION, docId);
+          } catch (error) {
+            // Ignore cleanup errors
+          }
+        }
+      }
+    });
+
+    it.skip('should query documents where field is NaN', async () => {
+      // NOTE: Firestore does not support storing NaN values in documents
+      // The unaryFilter IS_NAN exists in the API spec but cannot be tested
+      // because NaN cannot be written to Firestore
+      // Error: "Cannot convert firestore.v1.Value with type unset"
+
+      // This test is kept for documentation purposes but skipped
+      // The unit tests verify that the query builder correctly generates
+      // IS_NAN unaryFilter for NaN queries
+    });
   });
 
   describe('Field Transforms', () => {

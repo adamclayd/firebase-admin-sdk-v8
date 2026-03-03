@@ -215,6 +215,104 @@ describe('Firestore Query Builder', () => {
         offset: 10,
       });
     });
+
+    it('should use unaryFilter for null value queries', () => {
+      const query = buildStructuredQuery('users', {
+        where: [{ field: 'deletedAt', op: '==', value: null }],
+      });
+
+      expect(query.where).toEqual({
+        unaryFilter: {
+          field: { fieldPath: 'deletedAt' },
+          op: 'IS_NULL',
+        },
+      });
+    });
+
+    it('should use unaryFilter for undefined value queries', () => {
+      const query = buildStructuredQuery('users', {
+        where: [{ field: 'deletedAt', op: '==', value: undefined }],
+      });
+
+      expect(query.where).toEqual({
+        unaryFilter: {
+          field: { fieldPath: 'deletedAt' },
+          op: 'IS_NULL',
+        },
+      });
+    });
+
+    it('should use unaryFilter for NaN value queries', () => {
+      const query = buildStructuredQuery('users', {
+        where: [{ field: 'score', op: '==', value: NaN }],
+      });
+
+      expect(query.where).toEqual({
+        unaryFilter: {
+          field: { fieldPath: 'score' },
+          op: 'IS_NAN',
+        },
+      });
+    });
+
+    it('should use fieldFilter for non-null values', () => {
+      const query = buildStructuredQuery('users', {
+        where: [{ field: 'age', op: '==', value: 0 }],
+      });
+
+      expect(query.where).toEqual({
+        fieldFilter: {
+          field: { fieldPath: 'age' },
+          op: 'EQUAL',
+          value: { integerValue: '0' },
+        },
+      });
+    });
+
+    it('should handle multiple filters with null values', () => {
+      const query = buildStructuredQuery('users', {
+        where: [
+          { field: 'deletedAt', op: '==', value: null },
+          { field: 'active', op: '==', value: true },
+        ],
+      });
+
+      expect(query.where).toEqual({
+        compositeFilter: {
+          op: 'AND',
+          filters: [
+            {
+              unaryFilter: {
+                field: { fieldPath: 'deletedAt' },
+                op: 'IS_NULL',
+              },
+            },
+            {
+              fieldFilter: {
+                field: { fieldPath: 'active' },
+                op: 'EQUAL',
+                value: { booleanValue: true },
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    it('should use fieldFilter for null with non-equality operators', () => {
+      // Only == operator should trigger unaryFilter for null
+      const query = buildStructuredQuery('users', {
+        where: [{ field: 'age', op: '>', value: null }],
+      });
+
+      expect(query.where).toEqual({
+        fieldFilter: {
+          field: { fieldPath: 'age' },
+          op: 'GREATER_THAN',
+          value: { nullValue: null },
+        },
+      });
+    });
   });
 
   describe('mapWhereOp', () => {
