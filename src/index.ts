@@ -34,6 +34,7 @@ export {
   setDocument,
   addDocument,
   getDocument,
+  getAll,
   updateDocument,
   deleteDocument,
   queryDocuments,
@@ -54,6 +55,9 @@ export {
   generateSignedUrl,
   uploadFileResumable,
 } from './storage';
+
+// Messaging exports
+export { sendMessage, subscribeToTopic, unsubscribeFromTopic } from './messaging';
 
 // Field value helpers
 export { FieldValue } from './field-value';
@@ -89,6 +93,20 @@ export type {
   UpdateUserRequest,
   ListUsersResult,
 } from './types';
+
+// Messaging type exports
+export type {
+  Message,
+  Notification as FcmNotification,
+  AndroidConfig,
+  AndroidNotification,
+  WebpushConfig,
+  ApnsConfig,
+  FcmOptions,
+  SendResponse,
+  TopicManagementResponse,
+  TopicManagementError,
+} from './messaging';
 
 // Storage type exports
 export type {

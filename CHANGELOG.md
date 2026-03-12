@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-03-12
+
+### Added
+- **Firestore Batch Get (`getAll`)**: Fetch multiple documents in a single REST API call
+  - `getAll(collectionPath, documentIds)` - Batch get up to 100 documents via `documents:batchGet` endpoint
+  - Returns results in the same order as input document IDs
+  - Missing documents return `null` (no throw)
+  - Enforces 100-document limit with clear error message
+  - Supports subcollection paths
+  - 8 unit tests + 5 e2e tests
+
+### Changed
+- Total unit tests increased from 498 to 506 (+8 tests)
+
+## [2.6.0] - 2026-03-07
+
+### Added
+- **Firebase Cloud Messaging (FCM)**: Server-side push notification support via FCM HTTP v1 API
+  - `sendMessage()` - Send notifications to devices, topics, or conditions
+  - `subscribeToTopic()` - Subscribe up to 1000 device tokens to a topic
+  - `unsubscribeFromTopic()` - Unsubscribe device tokens from a topic
+  - Full TypeScript types for Message, Notification, AndroidConfig, WebpushConfig, ApnsConfig
+  - Platform-specific configuration support (Android, Web, iOS)
+  - Data-only messages and notification+data payloads
+  - Topic name normalization (auto-prefixes `/topics/` when missing)
+  - 29 comprehensive unit tests
+- New module: `src/messaging/` (client, types, index)
+- New exported types: `Message`, `FcmNotification`, `AndroidConfig`, `AndroidNotification`, `WebpushConfig`, `ApnsConfig`, `FcmOptions`, `SendResponse`, `TopicManagementResponse`, `TopicManagementError`
+
+### Changed
+- Total unit tests increased from 469 to 498 (+29 tests)
+- Total test suites increased from 16 to 17
+
 ## [2.5.2] - 2026-03-03
 
 ### Fixed

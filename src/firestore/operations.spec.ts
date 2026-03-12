@@ -6,6 +6,7 @@
 import {
   setDocument,
   getDocument,
+  getAll,
   updateDocument,
   deleteDocument,
   addDocument,
@@ -889,6 +890,192 @@ describe('Firestore Operations', () => {
       await expect(batchWrite([
         { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
       ])).rejects.toThrow('Failed to perform batch write');
+    });
+  });
+
+  describe('getAll', () => {
+    const basePath = `projects/${TEST_PROJECT}/databases/(default)/documents`;
+
+    it('should return empty array for empty input', async () => {
+      const result = await getAll('users', []);
+      expect(result).toEqual([]);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should fetch a single document', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', ['user1']);
+
+      expect(result).toEqual([{ name: 'Alice' }]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `https://firestore.googleapis.com/v1/${basePath}:batchGet`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Authorization': `Bearer ${TEST_TOKEN}`,
+          }),
+          body: JSON.stringify({
+            documents: [`${basePath}/users/user1`],
+          }),
+        })
+      );
+    });
+
+    it('should fetch multiple documents all found', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user2`,
+              fields: { name: { stringValue: 'Bob' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', ['user1', 'user2']);
+
+      expect(result).toEqual([{ name: 'Alice' }, { name: 'Bob' }]);
+    });
+
+    it('should return null for missing documents', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            missing: `${basePath}/users/user2`,
+          },
+          {
+            found: {
+              name: `${basePath}/users/user3`,
+              fields: { name: { stringValue: 'Charlie' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', ['user1', 'user2', 'user3']);
+
+      expect(result).toEqual([{ name: 'Alice' }, null, { name: 'Charlie' }]);
+    });
+
+    it('should reorder results to match input order', async () => {
+      // API returns results out of order
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user3`,
+              fields: { name: { stringValue: 'Charlie' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user2`,
+              fields: { name: { stringValue: 'Bob' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', ['user1', 'user2', 'user3']);
+
+      // Should match input order, not API response order
+      expect(result).toEqual([
+        { name: 'Alice' },
+        { name: 'Bob' },
+        { name: 'Charlie' },
+      ]);
+    });
+
+    it('should work with subcollection paths', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/uid1/posts/post1`,
+              fields: { title: { stringValue: 'Hello' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users/uid1/posts', ['post1']);
+
+      expect(result).toEqual([{ title: 'Hello' }]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({
+            documents: [`${basePath}/users/uid1/posts/post1`],
+          }),
+        })
+      );
+    });
+
+    it('should throw on API error', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Permission denied' }),
+      });
+
+      await expect(getAll('users', ['user1'])).rejects.toThrow('Failed to batch get documents');
+    });
+
+    it('should throw when more than 100 documents requested', async () => {
+      const ids = Array.from({ length: 101 }, (_, i) => `user${i}`);
+      await expect(getAll('users', ids)).rejects.toThrow('getAll supports a maximum of 100 documents per request');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 });

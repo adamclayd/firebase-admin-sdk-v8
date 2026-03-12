@@ -27,6 +27,7 @@ export {
 export {
   setDocument,
   getDocument,
+  getAll,
   updateDocument,
   deleteDocument,
   addDocument,
