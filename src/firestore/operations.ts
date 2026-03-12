@@ -574,6 +574,78 @@ export async function getAll(
 }
 
 /**
+ * Batch get multiple documents from different collections by their full paths
+ * Uses the documents:batchGet REST API endpoint
+ *
+ * @param documentRefs - Array of { collection, id } tuples pointing to documents (max 100)
+ * @returns Array of results in the same order as documentRefs. Missing documents return null.
+ * @throws {Error} If the operation fails or more than 100 documents requested
+ *
+ * @example
+ * ```typescript
+ * const docs = await getAllByPaths([
+ *   { collection: 'users/uid1/profile', id: 'default' },
+ *   { collection: 'users/uid2/profile', id: 'default' },
+ * ]);
+ * ```
+ */
+export async function getAllByPaths(
+  documentRefs: Array<{ collection: string; id: string }>
+): Promise<(DataObject | null)[]> {
+  if (documentRefs.length === 0) return [];
+
+  if (documentRefs.length > 100) {
+    throw new Error('getAllByPaths supports a maximum of 100 documents per request');
+  }
+
+  // Validate each document path
+  for (const ref of documentRefs) {
+    validateDocumentPath('collection', ref.collection, ref.id);
+  }
+
+  const accessToken = await getAdminAccessToken();
+  const projectId = getProjectId();
+
+  const basePath = `projects/${projectId}/databases/(default)/documents`;
+  const documents = documentRefs.map(ref => `${basePath}/${ref.collection}/${ref.id}`);
+
+  const url = `${FIRESTORE_API}/${basePath}:batchGet`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ documents }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to batch get documents: ${errorText}`);
+  }
+
+  const results = await response.json() as Array<{
+    found?: FirestoreDocument;
+    missing?: string;
+  }>;
+
+  // batchGet returns results potentially out of order — reorder to match input
+  const resultMap = new Map<string, DataObject | null>();
+  for (const result of results) {
+    if (result.found) {
+      const name = result.found.name!;
+      const data = convertFromFirestoreFormat(result.found.fields);
+      resultMap.set(name, data);
+    } else if (result.missing) {
+      resultMap.set(result.missing, null);
+    }
+  }
+
+  return documents.map(docPath => resultMap.get(docPath) ?? null);
+}
+
+/**
  * Perform batch write operations (set, update, delete)
  *
  * @param operations - Array of batch operations

@@ -28,6 +28,7 @@ export {
   setDocument,
   getDocument,
   getAll,
+  getAllByPaths,
   updateDocument,
   deleteDocument,
   addDocument,

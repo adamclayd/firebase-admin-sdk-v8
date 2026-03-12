@@ -35,6 +35,7 @@ export {
   addDocument,
   getDocument,
   getAll,
+  getAllByPaths,
   updateDocument,
   deleteDocument,
   queryDocuments,

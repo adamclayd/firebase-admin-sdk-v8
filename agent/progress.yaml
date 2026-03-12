@@ -416,6 +416,18 @@ blockers:
       - agent/tasks/security-h003-custom-claims-validation.md
       - agent/tasks/security-h004-signed-url-timing-attack.md
 
+feature_tasks:
+  - name: "getAllByPaths - Multi-path Firestore batch get"
+    file: agent/tasks/firestore-batch-get-by-paths.md
+    status: not_started
+    priority: high
+    estimated_hours: 2-3
+    created_date: 2026-03-12
+    notes: |
+      Batch-fetch documents from different Firestore collections in a single REST call.
+      Uses batchGet endpoint with arbitrary document paths (not limited to one collection).
+      Primary consumer: agentbase.me buildProfileMap for profile enrichment.
+
 bugs_pending:
   - name: FCM sendMessage uses getConfig().projectId instead of getProjectId()
     file: agent/tasks/fix-fcm-sendmessage-projectid-fallback.md

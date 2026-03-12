@@ -7,7 +7,7 @@
 
 import { initializeApp } from '../config';
 import { setDocument, deleteDocument } from './operations';
-import { getAll } from './operations';
+import { getAll, getAllByPaths } from './operations';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -95,5 +95,70 @@ describe('getAll E2E Tests', () => {
     ]);
 
     expect(results).toEqual([null, null]);
+  });
+});
+
+describe('getAllByPaths E2E Tests', () => {
+  const timestamp = Date.now();
+  const COLLECTION_A = 'e2e-bypath-a';
+  const COLLECTION_B = 'e2e-bypath-b';
+  const docIdA = `docA-${timestamp}`;
+  const docIdB = `docB-${timestamp}`;
+
+  beforeAll(async () => {
+    const serviceAccountPath = path.join(__dirname, '../../service-account.json');
+
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(
+        'service-account.json not found. Please add your Firebase service account credentials to the project root.'
+      );
+    }
+
+    const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf-8');
+    const serviceAccount = JSON.parse(serviceAccountJson);
+
+    initializeApp({
+      serviceAccount,
+      projectId: 'prmichaelsen-firebase-e2e',
+    });
+
+    await Promise.all([
+      setDocument(COLLECTION_A, docIdA, { name: 'Alpha', source: 'a' }),
+      setDocument(COLLECTION_B, docIdB, { name: 'Beta', source: 'b' }),
+    ]);
+  });
+
+  afterAll(async () => {
+    await Promise.all([
+      deleteDocument(COLLECTION_A, docIdA).catch(() => {}),
+      deleteDocument(COLLECTION_B, docIdB).catch(() => {}),
+    ]);
+  });
+
+  it('should batch get documents from different collections', async () => {
+    const results = await getAllByPaths([
+      { collection: COLLECTION_A, id: docIdA },
+      { collection: COLLECTION_B, id: docIdB },
+    ]);
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual(expect.objectContaining({ name: 'Alpha', source: 'a' }));
+    expect(results[1]).toEqual(expect.objectContaining({ name: 'Beta', source: 'b' }));
+  });
+
+  it('should return null for non-existing documents mixed with existing', async () => {
+    const results = await getAllByPaths([
+      { collection: COLLECTION_A, id: docIdA },
+      { collection: COLLECTION_B, id: `nonexistent-${timestamp}` },
+    ]);
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual(expect.objectContaining({ name: 'Alpha' }));
+    expect(results[1]).toBeNull();
+  });
+
+  it('should return empty array for empty input', async () => {
+    const results = await getAllByPaths([]);
+    expect(results).toEqual([]);
   });
 });
