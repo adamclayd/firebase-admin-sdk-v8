@@ -4,15 +4,15 @@
 
 project:
   name: firebase-admin-sdk-v8
-  version: 2.5.0
-  total_source_files: 21
-  total_tests: 463
-  total_test_suites: 16
+  version: 2.6.0
+  total_source_files: 24
+  total_tests: 498
+  total_test_suites: 17
   total_e2e_tests: 123
   e2e_tests_passing: 123
   coverage_current: 94.34
   coverage_target: 80
-  last_updated: 2026-02-19
+  last_updated: 2026-03-07
   coverage_by_metric:
     statements: 98.02
     branches: 93.05
@@ -48,6 +48,7 @@ project:
     storage: complete
     field_values: complete
     batch_operations: complete
+    messaging_fcm: complete
 
 files:
   - name: field-value.ts
@@ -415,6 +416,21 @@ blockers:
       - agent/tasks/security-h003-custom-claims-validation.md
       - agent/tasks/security-h004-signed-url-timing-attack.md
 
+bugs_pending:
+  - name: FCM sendMessage uses getConfig().projectId instead of getProjectId()
+    file: agent/tasks/fix-fcm-sendmessage-projectid-fallback.md
+    status: not_started
+    priority: high
+    severity: high
+    estimated_hours: 1
+    created_date: 2026-03-08
+    notes: |
+      sendMessage in src/messaging/client.ts line 34 uses getConfig().projectId
+      which returns undefined when initializeApp() hasn't been called.
+      All Firestore operations use getProjectId() which falls back to process.env.
+      Discovered in agentbase.me ChatRoom DO — Firestore worked but FCM silently failed.
+      Fix: change to use getProjectId() for consistency.
+
 bugs_fixed:
   - name: Subcollection query bug
     version: 2.0.14
@@ -777,6 +793,22 @@ notes: |
   - Focus on public API functions
 
 recent_work:
+  - date: 2026-03-07
+    description: Implemented Firebase Cloud Messaging (FCM) admin APIs
+    actual_hours: 0.2
+    items:
+      - Created src/messaging/ module (client.ts, types.ts, index.ts)
+      - Implemented sendMessage() via FCM HTTP v1 API
+      - Implemented subscribeToTopic() and unsubscribeFromTopic() via IID batch APIs
+      - Full TypeScript types for Message, Notification, AndroidConfig, WebpushConfig, ApnsConfig
+      - 29 comprehensive unit tests (all passing)
+      - Added exports to src/index.ts
+      - All 498 tests passing (17 test suites)
+      - Build verified successful
+      - Updated CHANGELOG.md for v2.6.0
+      - Updated package.json to v2.6.0
+      - Created design document agent/design/local.fcm-messaging.md
+
   - date: 2026-02-24
     description: Fixed critical merge:true bug causing "invalid path *" error
     items:

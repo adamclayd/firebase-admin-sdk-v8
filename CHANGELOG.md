@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports subcollection paths
   - 8 unit tests + 5 e2e tests
 
+### Fixed
+- **FCM**: `sendMessage` now uses `getProjectId()` instead of `getConfig().projectId`, fixing silent failure when `initializeApp()` hasn't been called (falls back to `FIREBASE_PROJECT_ID` env var)
+
 ### Changed
 - Total unit tests increased from 498 to 506 (+8 tests)
 
