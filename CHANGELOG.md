@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-03-19
+
+### Added
+- **Password Reset Link Generation (`generatePasswordResetLink`)**: Generate password reset links via Identity Toolkit API
+  - `generatePasswordResetLink(email, actionCodeSettings?)` - Generate out-of-band password reset link
+  - Supports `ActionCodeSettings` for custom continue URLs, mobile deep linking (iOS/Android), and custom hosting domains
+  - Returns the OOB link for sending via custom email delivery
+  - 6 unit tests + 3 e2e tests
+
 ## [2.8.0] - 2026-03-12
 
 ### Added

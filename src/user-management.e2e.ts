@@ -18,6 +18,7 @@ import {
   deleteUser,
   listUsers,
   setCustomUserClaims,
+  generatePasswordResetLink,
 } from './user-management';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -280,6 +281,54 @@ describe('User Management E2E Tests', () => {
     it('should throw error when deleting already deleted user', async () => {
       // Try to delete the user we just deleted
       await expect(deleteUser(testUserId || 'deleted-user')).rejects.toThrow();
+    });
+  });
+
+  describe('generatePasswordResetLink', () => {
+    let resetTestUserId: string;
+    const resetTestEmail = `reset-test-${Date.now()}@example.com`;
+
+    beforeAll(async () => {
+      const user = await createUser({
+        email: resetTestEmail,
+        password: 'ResetTest123!',
+      });
+      resetTestUserId = user.uid;
+    });
+
+    afterAll(async () => {
+      if (resetTestUserId) {
+        try {
+          await deleteUser(resetTestUserId);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    it('should generate a password reset link for an existing user', async () => {
+      const link = await generatePasswordResetLink(resetTestEmail);
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+    });
+
+    it('should generate a password reset link with actionCodeSettings', async () => {
+      const link = await generatePasswordResetLink(resetTestEmail, {
+        url: 'https://prmichaelsen-firebase-e2e.firebaseapp.com/continue',
+      });
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+      expect(link).toContain('continueUrl');
+    });
+
+    it('should throw error for non-existent email', async () => {
+      await expect(
+        generatePasswordResetLink(`nonexistent-${Date.now()}@example.com`)
+      ).rejects.toThrow();
     });
   });
 

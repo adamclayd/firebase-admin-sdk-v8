@@ -316,3 +316,34 @@ export interface ListUsersResult {
   /** Token for fetching the next page (if available) */
   pageToken?: string;
 }
+
+/**
+ * Settings for email action links (password reset, email verification, etc.)
+ */
+export interface ActionCodeSettings {
+  /** The continue/state URL to redirect to after the action is completed */
+  url: string;
+  /** Whether the action link should be opened in a mobile app or web */
+  handleCodeInApp?: boolean;
+  /** iOS-specific settings */
+  iOS?: {
+    /** The iOS bundle ID of the app to open the link in */
+    bundleId: string;
+  };
+  /** Android-specific settings */
+  android?: {
+    /** The Android package name of the app to open the link in */
+    packageName: string;
+    /** Whether to install the app if not already installed */
+    installApp?: boolean;
+    /** Minimum Android app version required */
+    minimumVersion?: string;
+  };
+  /**
+   * The domain to use for Dynamic Links
+   * @deprecated Use linkDomain instead
+   */
+  dynamicLinkDomain?: string;
+  /** Custom Firebase Hosting domain to use for the link */
+  linkDomain?: string;
+}

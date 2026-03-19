@@ -27,6 +27,7 @@ export {
   deleteUser,
   listUsers,
   setCustomUserClaims,
+  generatePasswordResetLink,
 } from './user-management';
 
 // Firestore exports
@@ -93,6 +94,7 @@ export type {
   CreateUserRequest,
   UpdateUserRequest,
   ListUsersResult,
+  ActionCodeSettings,
 } from './types';
 
 // Messaging type exports

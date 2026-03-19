@@ -10,6 +10,7 @@ import type {
   CreateUserRequest,
   UpdateUserRequest,
   ListUsersResult,
+  ActionCodeSettings,
 } from './types';
 
 const IDENTITY_TOOLKIT_API = 'https://identitytoolkit.googleapis.com/v1';
@@ -334,4 +335,107 @@ export async function setCustomUserClaims(
     const errorText = await response.text();
     throw new Error(`Failed to set custom claims: ${response.status} ${errorText}`);
   }
+}
+
+/**
+ * Build the server request body from ActionCodeSettings
+ */
+function buildActionCodeSettingsRequest(settings: ActionCodeSettings): Record<string, any> {
+  const request: Record<string, any> = {};
+
+  request.continueUrl = settings.url;
+
+  if (typeof settings.handleCodeInApp === 'boolean') {
+    request.canHandleCodeInApp = settings.handleCodeInApp;
+  }
+
+  if (settings.iOS?.bundleId) {
+    request.iOSBundleId = settings.iOS.bundleId;
+  }
+
+  if (settings.android) {
+    request.androidPackageName = settings.android.packageName;
+    if (typeof settings.android.installApp === 'boolean') {
+      request.androidInstallApp = settings.android.installApp;
+    }
+    if (settings.android.minimumVersion) {
+      request.androidMinimumVersion = settings.android.minimumVersion;
+    }
+  }
+
+  if (settings.dynamicLinkDomain) {
+    request.dynamicLinkDomain = settings.dynamicLinkDomain;
+  }
+
+  if (settings.linkDomain) {
+    request.linkDomain = settings.linkDomain;
+  }
+
+  return request;
+}
+
+/**
+ * Generate a password reset link for the given email address
+ *
+ * Returns an out-of-band (OOB) link that can be sent to the user
+ * via a custom email delivery mechanism.
+ *
+ * @param email - User's email address
+ * @param actionCodeSettings - Optional settings for the action code
+ * @returns Password reset link URL
+ *
+ * @example
+ * ```typescript
+ * const link = await generatePasswordResetLink('user@example.com', {
+ *   url: 'https://example.com/login',
+ * });
+ * // Send the link via your own email service
+ * await sendEmail(email, `Reset your password: ${link}`);
+ * ```
+ */
+export async function generatePasswordResetLink(
+  email: string,
+  actionCodeSettings?: ActionCodeSettings
+): Promise<string> {
+  if (!email || typeof email !== 'string') {
+    throw new Error('email must be a non-empty string');
+  }
+
+  const projectId = getProjectId();
+  const accessToken = await getAdminAccessToken();
+
+  const requestBody: Record<string, any> = {
+    requestType: 'PASSWORD_RESET',
+    email,
+    returnOobLink: true,
+  };
+
+  if (actionCodeSettings) {
+    Object.assign(requestBody, buildActionCodeSettingsRequest(actionCodeSettings));
+  }
+
+  const response = await fetch(
+    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:sendOobCode`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to generate password reset link: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.oobLink) {
+    throw new Error('Password reset link not returned by server');
+  }
+
+  return data.oobLink;
 }
