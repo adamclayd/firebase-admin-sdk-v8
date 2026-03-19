@@ -1,12 +1,17 @@
 name: Publish to npm
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Unit Tests", "E2E Tests"]
+    types: [completed]
     branches: [mainline]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'mainline'
     permissions:
       contents: read
     steps:
@@ -26,21 +31,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run unit tests
-        run: npm test
-
-      - name: Create service account file
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > service-account.json
-
-      - name: Run e2e tests
-        run: npm run test:e2e
-        env:
-          NODE_ENV: test
-
-      - name: Clean up service account file
-        if: always()
-        run: rm -f service-account.json
-
       - name: Check if version changed
         id: version
         run: |
@@ -52,6 +42,26 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify other workflow also passed
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          # Determine which workflow triggered us
+          TRIGGER="${{ github.event.workflow_run.name }}"
+          if [ "$TRIGGER" == "Unit Tests" ]; then
+            OTHER="E2E Tests"
+          else
+            OTHER="Unit Tests"
+          fi
+
+          # Check the other workflow's latest run on mainline
+          STATUS=$(gh run list --workflow="$OTHER" --branch=mainline --limit=1 --json conclusion --jq '.[0].conclusion')
+          if [ "$STATUS" != "success" ]; then
+            echo "::error::$OTHER has not passed (status: $STATUS). Skipping publish."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Publish
         if: steps.version.outputs.changed == 'true'
