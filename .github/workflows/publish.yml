@@ -1,0 +1,75 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [mainline]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Create service account file
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > service-account.json
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+
+      - name: Clean up service account file
+        if: always()
+        run: rm -f service-account.json
+
+      - name: Check if version changed
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          PREVIOUS=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version" 2>/dev/null || echo "")
+          if [ "$CURRENT" != "$PREVIOUS" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        if: steps.version.outputs.changed == 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.version.outputs.changed }}" == "true" ]; then
+            echo "### 📦 Published to npm" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Package**: \`@prmichaelsen/firebase-admin-sdk-v8@${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "[View on npm](https://www.npmjs.com/package/@prmichaelsen/firebase-admin-sdk-v8/v/${{ steps.version.outputs.version }})" >> "$GITHUB_STEP_SUMMARY"
+          else
+            CURRENT=$(node -p "require('./package.json').version")
+            echo "### ⏭️ Publish skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Version \`$CURRENT\` unchanged — no publish needed." >> "$GITHUB_STEP_SUMMARY"
+          fi
