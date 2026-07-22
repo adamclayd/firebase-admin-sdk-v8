@@ -26,6 +26,7 @@ describe('Storage Client', () => {
     mockGetAdminAccessToken.mockResolvedValue('mock-access-token');
     mockGetProjectId.mockReturnValue('test-project');
     delete process.env.FIREBASE_STORAGE_BUCKET;
+    delete process.env.FIREBASE_STORAGE_EMULATOR_HOST;
     
     // Mock global fetch
     global.fetch = jest.fn();

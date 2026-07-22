@@ -4,10 +4,22 @@
  */
 
 import { getAdminAccessToken } from '../token-generation';
-import { getProjectId } from '../config';
+import { getProjectId, getStorageEmulatorHost } from '../config';
 import type { FileMetadata, UploadOptions } from './client';
 
 const UPLOAD_API_BASE = 'https://storage.googleapis.com/upload/storage/v1';
+const UPLOAD_EMULATOR_PATH = 'upload/storage/v1';
+
+function getUrl(path: string) {
+  const emuHost = getStorageEmulatorHost();
+  path.startsWith('/') && (path = path.slice(1));
+  path.endsWith('/') && (path = path.slice(0, -1));
+  
+  emuHost && (path = `http://${emuHost}/${UPLOAD_EMULATOR_PATH}/${path}`);
+  !emuHost && (path = `${UPLOAD_API_BASE}/${path}`);
+
+  return path;
+}
 
 /**
  * Get the default storage bucket name
@@ -56,8 +68,8 @@ async function initiateResumableUpload(
   totalSize: number,
   metadata?: Record<string, string>
 ): Promise<string> {
-  const token = await getAdminAccessToken();
-  const url = `${UPLOAD_API_BASE}/b/${encodeURIComponent(bucket)}/o?uploadType=resumable&name=${encodeURIComponent(path)}`;
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o?uploadType=resumable&name=${encodeURIComponent(path)}`);
   
   const requestBody: any = {};
   if (metadata) {
@@ -270,7 +282,13 @@ export async function uploadFileResumable(
   options: ResumableUploadOptions = {}
 ): Promise<FileMetadata> {
   const bucket = getDefaultBucket();
-  const chunkSize = options.chunkSize || 256 * 1024; // 256KB default
+  let chunkSize = options.chunkSize || 256 * 1024; // 256KB default
+  
+  // The Firebase Storage emulator does not properly support chunked resumable
+  // uploads and will return 200 OK on the first chunk. We must upload in a single chunk.
+  if (getStorageEmulatorHost() && options.totalSize) {
+    chunkSize = Math.max(chunkSize, options.totalSize);
+  }
   
   // Check if data is a ReadableStream
   if (data instanceof ReadableStream) {
@@ -280,6 +298,10 @@ export async function uploadFileResumable(
   // Convert to ArrayBuffer for non-stream data
   const buffer = await toArrayBuffer(data);
   const total = buffer.byteLength;
+  
+  if (getStorageEmulatorHost()) {
+    chunkSize = Math.max(chunkSize, total);
+  }
   
   // Initiate or resume session
   let sessionUri = options.resumeToken;

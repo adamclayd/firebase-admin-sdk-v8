@@ -4,10 +4,25 @@
  */
 
 import { getAdminAccessToken } from '../token-generation';
-import { getProjectId } from '../config';
+import { getProjectId, getStorageEmulatorHost } from '../config';
 
 const STORAGE_API_BASE = 'https://storage.googleapis.com/storage/v1';
 const UPLOAD_API_BASE = 'https://storage.googleapis.com/upload/storage/v1';
+const STORAGE_EMULATOR_PATH = 'storage/v1';
+const UPLOAD_EMULATOR_PATH = 'upload/storage/v1';
+
+function getUrl(path: string, forUpload = false) {
+  let emuHost = getStorageEmulatorHost();
+  path.startsWith('/') && (path = path.slice(1));
+  path.endsWith('/') && (path = path.slice(0, -1));
+
+  emuHost && forUpload && (path = `http://${emuHost}/${UPLOAD_EMULATOR_PATH}/${path}`);
+  emuHost && !forUpload && (path = `http://${emuHost}/${STORAGE_EMULATOR_PATH}/${path}`);
+  !emuHost && forUpload && (path = `${UPLOAD_API_BASE}/${path}`);
+  !emuHost && !forUpload && (path = `${STORAGE_API_BASE}/${path}`);
+
+  return path;
+}
 
 /**
  * Options for uploading files
@@ -125,56 +140,118 @@ export async function uploadFile(
   data: ArrayBuffer | Uint8Array | Blob,
   options: UploadOptions = {}
 ): Promise<FileMetadata> {
-  const token = await getAdminAccessToken();
+  const isEmulator = !!getStorageEmulatorHost();
+  const token = await getAdminAccessToken(isEmulator);
   const bucket = getDefaultBucket();
   
   // Detect content type if not provided
   const contentType = options.contentType || detectContentType(path);
-  
-  // Build upload URL with simple upload
-  const url = `${UPLOAD_API_BASE}/b/${encodeURIComponent(bucket)}/o?uploadType=media&name=${encodeURIComponent(path)}`;
-  
-  // Convert data to ArrayBuffer if needed
-  let body: ArrayBuffer;
-  if (data instanceof Blob) {
-    body = await data.arrayBuffer() as ArrayBuffer;
-  } else if (data instanceof Uint8Array) {
-    // Create a proper ArrayBuffer from Uint8Array
-    const buffer = new ArrayBuffer(data.byteLength);
-    new Uint8Array(buffer).set(data);
-    body = buffer;
+
+  if (isEmulator) {
+    // Emulator path: use multipart upload to handle metadata and data atomically
+    let dataBytes: Uint8Array;
+    if (data instanceof Blob) {
+      dataBytes = new Uint8Array(await data.arrayBuffer());
+    } else if (data instanceof Uint8Array) {
+      dataBytes = data;
+    } else {
+      dataBytes = new Uint8Array(data);
+    }
+    
+    // Construct multipart body
+    const metadataObject: Record<string, unknown> = {
+      name: path,
+      contentType,
+    };
+    if (options.metadata) {
+      metadataObject.metadata = options.metadata;
+    }
+
+    const boundary = `===FIREBASE_ADMIN_SDK_${Date.now()}===`;
+    const encoder = new TextEncoder();
+    
+    const part1 = encoder.encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadataObject)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`
+    );
+    const part2 = encoder.encode(`\r\n--${boundary}--`);
+    
+    const totalLength = part1.byteLength + dataBytes.byteLength + part2.byteLength;
+    const body = new Uint8Array(totalLength);
+    body.set(part1, 0);
+    body.set(dataBytes, part1.byteLength);
+    body.set(part2, part1.byteLength + dataBytes.byteLength);
+    
+    const url = getUrl(`/b/${encodeURIComponent(bucket)}/o?uploadType=multipart`, true);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+        'Content-Length': totalLength.toString(),
+      },
+      body,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
+    }
+    
+    const result = await response.json() as FileMetadata;
+    
+    if (options.public) {
+      await makeFilePublic(path);
+    }
+    
+    return result;
   } else {
-    body = data;
+    // Production path: use media upload followed by metadata update
+    // Build upload URL with simple upload
+    const url = getUrl(`/b/${encodeURIComponent(bucket)}/o?uploadType=media&name=${encodeURIComponent(path)}`, true);
+    
+    // Convert data to ArrayBuffer if needed
+    let body: ArrayBuffer;
+    if (data instanceof Blob) {
+      body = await data.arrayBuffer() as ArrayBuffer;
+    } else if (data instanceof Uint8Array) {
+      // Create a proper ArrayBuffer from Uint8Array
+      const buffer = new ArrayBuffer(data.byteLength);
+      new Uint8Array(buffer).set(data);
+      body = buffer;
+    } else {
+      body = data;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': contentType,
+        'Content-Length': body.byteLength.toString(),
+      },
+      body,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
+    }
+    
+    const result = await response.json() as FileMetadata;
+    
+    // Set public access if requested
+    if (options.public) {
+      await makeFilePublic(path);
+    }
+    
+    // Update custom metadata if provided
+    if (options.metadata) {
+      return await updateFileMetadata(path, options.metadata);
+    }
+
+    return result;
   }
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': contentType,
-      'Content-Length': body.byteLength.toString(),
-    },
-    body,
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
-  }
-  
-  const result = await response.json() as FileMetadata;
-  
-  // Set public access if requested
-  if (options.public) {
-    await makeFilePublic(path);
-  }
-  
-  // Update custom metadata if provided
-  if (options.metadata) {
-    return await updateFileMetadata(path, options.metadata);
-  }
-  
-  return result;
 }
 
 /**
@@ -195,10 +272,10 @@ export async function downloadFile(
   path: string,
   _options: DownloadOptions = {}
 ): Promise<ArrayBuffer> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}?alt=media`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}?alt=media`);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -226,10 +303,10 @@ export async function downloadFile(
  * ```
  */
 export async function deleteFile(path: string): Promise<void> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`);
   
   const response = await fetch(url, {
     method: 'DELETE',
@@ -257,10 +334,10 @@ export async function deleteFile(path: string): Promise<void> {
  * ```
  */
 export async function getFileMetadata(path: string): Promise<FileMetadata> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -288,10 +365,10 @@ async function updateFileMetadata(
   path: string,
   metadata: Record<string, string>
 ): Promise<FileMetadata> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}`);
   
   const response = await fetch(url, {
     method: 'PATCH',
@@ -316,10 +393,10 @@ async function updateFileMetadata(
  * @param path - File path in storage
  */
 async function makeFilePublic(path: string): Promise<void> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}/acl`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}/acl`);
   
   const response = await fetch(url, {
     method: 'POST',
@@ -358,7 +435,7 @@ async function makeFilePublic(path: string): Promise<void> {
  * ```
  */
 export async function listFiles(options: ListOptions = {}): Promise<ListFilesResult> {
-  const token = await getAdminAccessToken();
+  const token = await getAdminAccessToken(!!getStorageEmulatorHost());
   const bucket = getDefaultBucket();
   
   // Build query parameters
@@ -368,7 +445,7 @@ export async function listFiles(options: ListOptions = {}): Promise<ListFilesRes
   if (options.maxResults) params.append('maxResults', options.maxResults.toString());
   if (options.pageToken) params.append('pageToken', options.pageToken);
   
-  const url = `${STORAGE_API_BASE}/b/${encodeURIComponent(bucket)}/o?${params.toString()}`;
+  const url = getUrl(`/b/${encodeURIComponent(bucket)}/o?${params.toString()}`);
   
   const response = await fetch(url, {
     method: 'GET',

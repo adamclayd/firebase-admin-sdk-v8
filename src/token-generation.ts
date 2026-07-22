@@ -5,7 +5,6 @@
 
 import type { ServiceAccount, TokenResponse } from './types';
 import { getServiceAccount } from './service-account';
-
 /**
  * Base64URL encode a string
  */
@@ -101,8 +100,11 @@ let tokenExpiry: number = 0;
  * @returns {Promise<string>} Valid OAuth access token
  * @throws {Error} If token generation fails
  */
-export async function getAdminAccessToken(): Promise<string> {
-  // Return cached token if still valid (with 1 minute buffer)
+export async function getAdminAccessToken(emulated = false): Promise<string> {
+  if (emulated) {
+    return 'owner';
+  }
+
   if (cachedAccessToken && Date.now() < tokenExpiry) {
     return cachedAccessToken;
   }
