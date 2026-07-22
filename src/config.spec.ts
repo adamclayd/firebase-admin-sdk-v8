@@ -3,12 +3,17 @@
  * Tests SDK configuration and service account management
  */
 
+import { signInWithCustomToken } from './auth';
+import { getDocument } from './firestore-rest';
+
 import {
   initializeApp,
   getConfig,
   clearConfig,
   getServiceAccount,
   getProjectId,
+  getAuthEmulatorHost,
+  getFirestoreEmulatorHost,
 } from './config';
 
 describe('Config Management', () => {
@@ -24,6 +29,9 @@ describe('Config Management', () => {
       delete process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY;
       delete process.env.FIREBASE_PROJECT_ID;
       delete process.env.PUBLIC_FIREBASE_PROJECT_ID;
+      delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
     }
   });
 
@@ -325,3 +333,138 @@ describe('Config Management', () => {
     });
   });
 });
+
+describe('getFirestoreEmulatorHost', () => {
+  beforeEach(() => {
+    clearConfig();
+
+    // Reset environment variables
+    if (typeof process !== 'undefined' && process.env) {
+      delete process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY;
+      delete process.env.FIREBASE_PROJECT_ID;
+      delete process.env.PUBLIC_FIREBASE_PROJECT_ID;
+      delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+    }
+  });
+  
+  it('fallback to process env FIREBASE_FIRESTORE_EMULATOR_HOST', () => {
+    if (typeof process !== 'undefined' && process.env) {
+      process.env.FIREBASE_FIRESTORE_EMULATOR_HOST = 'localhost:9099';
+      expect(getFirestoreEmulatorHost()).toBe('localhost:9099');
+    }
+  })
+  
+  it('should get its value from global config first', () => {
+    initializeApp({ firestoreEmulatorHost: 'localhost:9099' });
+    process.env.FIREBASE_FIRESTORE_EMULATOR_HOST = '127.0.0.1:9099';
+
+    expect(getFirestoreEmulatorHost()).toBe('localhost:9099');
+  })
+
+  it('should be undefined if the env variable or global config property is not present', () => {
+    expect(getFirestoreEmulatorHost()).toBeUndefined();
+  });
+});
+
+describe('getAuthEmulatorHost', () => {
+  beforeEach(() => {
+    clearConfig();
+
+    // Reset environment variables
+    if (typeof process !== 'undefined' && process.env) {
+      delete process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY;
+      delete process.env.FIREBASE_PROJECT_ID;
+      delete process.env.PUBLIC_FIREBASE_PROJECT_ID;
+      delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+      delete process.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+    }
+  })
+  it('fallback to process env FIREBASE_AUTH_EMULATOR_HOST', () => {
+    if (typeof process !== 'undefined' && process.env) {
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+      expect(getAuthEmulatorHost()).toBe('localhost:9099');
+    }
+  });
+  
+  it('should get its value from global config first', () => {
+    initializeApp({ authEmulatorHost: 'localhost:9099' });
+    if(process) process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+
+    expect(getAuthEmulatorHost()).toBe('localhost:9099');
+  });
+
+  it('should be undefined if the env variable or global config property is not present', () => {
+
+    expect(getAuthEmulatorHost()).toBeUndefined();
+  });
+});
+
+describe('Emulators Take Precenecy over Global Config & Env variables', () => {
+
+  it('should call the emulator over the production env for any firestore api call if firestoreEmulatorHost is present', async () => {
+    initializeApp({
+      projectId: 'test-project-id',
+      firestoreEmulatorHost: 'localhost:8080',
+      apiKey: 'api-key',
+      serviceAccount: {
+        type: 'service_account',
+        project_id: 'test-project',
+        private_key_id: 'key-id',
+        private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----',
+        client_email: 'test@test-project.iam.gserviceaccount.com',
+        client_id: '123456789',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oaxuth2.googleapis.com/token',
+        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+        client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com',
+      }
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    })
+    await getDocument('fake-path', 'fake-id');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/projects/test-project-id/databases/(default)/documents/fake-path/fake-id',
+      expect.any(Object)
+    );
+  });
+
+  it('should call the emulator over the production env for any auth api call if authEmulatorHost is present', async () => {
+    initializeApp({
+      projectId: 'test-project-id',
+      authEmulatorHost: 'localhost:9099',
+      apiKey: 'api-key',
+      serviceAccount: {
+        type: 'service_account',
+        project_id: 'test-project',
+        private_key_id: 'key-id',
+        private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----',
+        client_email: 'test@test-project.iam.gserviceaccount.com',
+        client_id: '123456789',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oaxuth2.googleapis.com/token',
+        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+        client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com',
+      }
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    await signInWithCustomToken('fake-token');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=api-key',
+      expect.any(Object)
+    );
+  });
+})
+

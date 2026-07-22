@@ -29,8 +29,17 @@ import {
   validateDocumentPath,
   validateCollectionPath,
 } from './path-validation';
+import { getFirestoreEmulatorHost } from '../config';
 
 const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
+const FIRESTORE_EMULATED_PATH = 'v1';
+
+function getUrl(path: string) {
+  const emuHost = getFirestoreEmulatorHost();
+  path.endsWith('/') && (path = path.slice(0, -1));
+  path.startsWith('/') && (path = path.slice(1));
+  return emuHost ? `http://${emuHost}/${FIRESTORE_EMULATED_PATH}/${path}` : `${FIRESTORE_API}/${path}`;
+}
 
 /**
  * Commit writes to Firestore using the :commit API
@@ -40,11 +49,12 @@ const FIRESTORE_API = 'https://firestore.googleapis.com/v1';
  * @throws {Error} If the commit fails
  */
 async function commitWrites(writes: FirestoreWrite[]): Promise<void> {
-  const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:commit`;
-  
+  const url = getUrl(`/projects/${projectId}/databases/(default)/documents:commit`);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -92,6 +102,7 @@ export async function setDocument(
   validateDocumentPath('collectionPath', collectionPath, documentId);
   
   const projectId = getProjectId();
+  const emuHost = getFirestoreEmulatorHost();
   const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
   const cleanData = removeFieldTransforms(data);
@@ -126,8 +137,8 @@ export async function setDocument(
   }
   
   // No transforms - use regular PATCH endpoint
-  const accessToken = await getAdminAccessToken();
-  const url = `${FIRESTORE_API}/${documentPath}`;
+  const accessToken = await getAdminAccessToken(!!emuHost);
+  const url = getUrl(documentPath)
   
   let queryParams = '';
   
@@ -185,10 +196,11 @@ export async function addDocument(
   // Validate collection path (should have odd number of segments)
   validateCollectionPath('collectionPath', collectionPath);
   
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
   
-  const baseUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}`;
+  const baseUrl = getUrl(`/projects/${projectId}/databases/(default)/documents/${collectionPath}`);
   const url = documentId ? `${baseUrl}?documentId=${documentId}` : baseUrl;
   
   const cleanData = removeFieldTransforms(data);
@@ -247,11 +259,11 @@ export async function getDocument(
   // Validate document path
   validateDocumentPath('collectionPath', collectionPath, documentId);
   
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
   
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
-  
+  const url = getUrl(`/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`);
   const response = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -296,6 +308,7 @@ export async function updateDocument(
   // Validate document path
   validateDocumentPath('collectionPath', collectionPath, documentId);
   
+  const emuHost = getFirestoreEmulatorHost();
   const projectId = getProjectId();
   const documentPath = `projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
   
@@ -345,8 +358,8 @@ export async function updateDocument(
   }
   
   // No transforms - use regular PATCH endpoint
-  const accessToken = await getAdminAccessToken();
-  const url = `${FIRESTORE_API}/${documentPath}`;
+  const accessToken = await getAdminAccessToken(!!emuHost);
+  const url = getUrl(`/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`);
   
   // Create query string with multiple updateMask.fieldPaths parameters
   const updateMaskParams = updateMaskFields
@@ -388,10 +401,11 @@ export async function deleteDocument(
   // Validate document path
   validateDocumentPath('collectionPath', collectionPath, documentId);
   
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
   
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`;
+  const url = getUrl(`/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`);
   
   const response = await fetch(url, {
     method: 'DELETE',
@@ -433,12 +447,13 @@ export async function queryDocuments(
   // Validate collection path (should have odd number of segments)
   validateCollectionPath('collectionPath', collectionPath);
   
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
   
   // If no query options, use simple list
   if (!options || Object.keys(options).length === 0) {
-    const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${collectionPath}`;
+    const url = getUrl(`/projects/${projectId}/databases/(default)/documents/${collectionPath}`);
     
     const response = await fetch(url, {
       headers: {
@@ -469,10 +484,10 @@ export async function queryDocuments(
     // Subcollection: use parent document path in URL
     // e.g., "users/user123/posts" -> URL ends with "users/user123:runQuery"
     const parentPath = pathSegments.slice(0, -1).join('/');
-    queryUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents/${parentPath}:runQuery`;
+    queryUrl = getUrl(`/projects/${projectId}/databases/(default)/documents/${parentPath}:runQuery`);
   } else {
     // Top-level collection
-    queryUrl = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:runQuery`;
+    queryUrl = getUrl(`/projects/${projectId}/databases/(default)/documents:runQuery`);
   }
   
   const structuredQuery = buildStructuredQuery(collectionPath, options);
@@ -531,13 +546,14 @@ export async function getAll(
     validateDocumentPath('collectionPath', collectionPath, id);
   }
 
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
 
   const basePath = `projects/${projectId}/databases/(default)/documents`;
   const documents = documentIds.map(id => `${basePath}/${collectionPath}/${id}`);
 
-  const url = `${FIRESTORE_API}/${basePath}:batchGet`;
+  const url = getUrl(`/${basePath}:batchGet`);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -603,13 +619,14 @@ export async function getAllByPaths(
     validateDocumentPath('collection', ref.collection, ref.id);
   }
 
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
 
   const basePath = `projects/${projectId}/databases/(default)/documents`;
   const documents = documentRefs.map(ref => `${basePath}/${ref.collection}/${ref.id}`);
 
-  const url = `${FIRESTORE_API}/${basePath}:batchGet`;
+  const url = getUrl(`/${basePath}:batchGet`);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -662,10 +679,11 @@ export async function getAllByPaths(
  * ```
  */
 export async function batchWrite(operations: BatchWrite[]): Promise<BatchWriteResult> {
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getFirestoreEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   const projectId = getProjectId();
   
-  const url = `${FIRESTORE_API}/projects/${projectId}/databases/(default)/documents:commit`;
+  const url = getUrl(`/projects/${projectId}/databases/(default)/documents:commit`);
   
   const writes = operations.map(op => {
     const docPath = `projects/${projectId}/databases/(default)/documents/${op.collectionPath}/${op.documentId}`;

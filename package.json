@@ -1,6 +1,6 @@
 {
   "name": "@prmichaelsen/firebase-admin-sdk-v8",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "description": "Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -26,8 +26,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "node --env-file=.env node_modules/.bin/jest --config jest.e2e.config.js",
-    "test:e2e:watch": "node --env-file=.env node_modules/.bin/jest --config jest.e2e.config.js --watch",
+    "test:e2e": "node --env-file=.env node_modules/jest/bin/jest.js --config jest.e2e.config.js",
+    "test:e2e:watch": "node --env-file=.env node_modules/jest/bin/jest.js --config jest.e2e.config.js --watch",
     "test:all": "npm test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
@@ -46,9 +46,11 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^20.11.0",
+    "@types/which": "^3.0.4",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "which": "^7.0.0"
   }
 }
