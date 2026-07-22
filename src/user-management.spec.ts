@@ -14,12 +14,14 @@ import {
   generateEmailVerificationLink,
 } from './user-management';
 import * as config from './config';
+import * as config from './config';
 import * as tokenGeneration from './token-generation';
 import * as serviceAccount from './service-account';
 
 // Mock dependencies
 jest.mock('./token-generation');
 jest.mock('./service-account');
+jest.mock('./config');
 jest.mock('./config');
 
 const mockGetAdminAccessToken = tokenGeneration.getAdminAccessToken as jest.MockedFunction<
@@ -54,6 +56,7 @@ describe('User Management', () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => ({ users: [ mockUser ] }),
+        json: async () => ({ users: [ mockUser ] }),
       });
 
       const result = await getUserByEmail('test@example.com');
@@ -81,6 +84,7 @@ describe('User Management', () => {
             'Authorization': 'Bearer mock-access-token',
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ email: [ 'test@example.com' ] }),
           body: JSON.stringify({ email: [ 'test@example.com' ] }),
         }
       );
@@ -130,6 +134,7 @@ describe('User Management', () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => ({ users: [ mockUser ] }),
+        json: async () => ({ users: [ mockUser ] }),
       });
 
       const result = await getUserByUid('user123');
@@ -155,6 +160,7 @@ describe('User Management', () => {
             'Authorization': 'Bearer mock-access-token',
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ localId: [ 'user123' ] }),
           body: JSON.stringify({ localId: [ 'user123' ] }),
         }
       );
@@ -201,6 +207,7 @@ describe('User Management', () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => ({ users: [ mockUserRecord ] }),
           json: async () => ({ users: [ mockUserRecord ] }),
         });
 
@@ -253,6 +260,7 @@ describe('User Management', () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => ({ users: [ mockUserRecord ] }),
           json: async () => ({ users: [ mockUserRecord ] }),
         });
 
@@ -309,6 +317,7 @@ describe('User Management', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ users: [ mockUserRecord ] }),
+          json: async () => ({ users: [ mockUserRecord ] }),
         });
 
       const result = await updateUser('user123', {
@@ -355,12 +364,14 @@ describe('User Management', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ users: [ mockUserRecord ] }),
+          json: async () => ({ users: [ mockUserRecord ] }),
         });
 
       const result = await updateUser('user123', { disabled: true });
 
       expect(result.disabled).toBe(true);
 
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       expect(callBody.disableUser).toBe(true);
     });
@@ -454,6 +465,8 @@ describe('User Management', () => {
       expect(result.users).toHaveLength(2);
       expect(result.users[ 0 ].uid).toBe('user1');
       expect(result.users[ 1 ].uid).toBe('user2');
+      expect(result.users[ 0 ].uid).toBe('user1');
+      expect(result.users[ 1 ].uid).toBe('user2');
       expect(result.pageToken).toBe('next-page-token');
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -494,6 +507,7 @@ describe('User Management', () => {
 
       await listUsers();
 
+      const callUrl = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
       const callUrl = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
       expect(callUrl).toContain('maxResults=1000');
     });
@@ -557,6 +571,7 @@ describe('User Management', () => {
 
       await setCustomUserClaims('user123', null);
 
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       expect(callBody.customAttributes).toBe('{}');
     });
@@ -635,6 +650,7 @@ describe('User Management', () => {
       });
 
       const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       expect(callBody.continueUrl).toBe('https://example.com/continue');
       expect(callBody.canHandleCodeInApp).toBe(true);
       expect(callBody.iOSBundleId).toBe('com.example.ios');
@@ -653,6 +669,7 @@ describe('User Management', () => {
 
       await generatePasswordResetLink('test@example.com');
 
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
       expect(callBody.continueUrl).toBeUndefined();
       expect(callBody.canHandleCodeInApp).toBeUndefined();
@@ -810,6 +827,7 @@ describe('User Management', () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => ({ users: [ mockUser ] }),
+        json: async () => ({ users: [ mockUser ] }),
       });
 
       const result = await getUserByUid('user123');
@@ -829,6 +847,7 @@ describe('User Management', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
+        json: async () => ({ users: [ mockUser ] }),
         json: async () => ({ users: [ mockUser ] }),
       });
 
