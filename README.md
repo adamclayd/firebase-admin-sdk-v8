@@ -67,7 +67,12 @@ import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
 // Option 1: Explicit initialization
 initializeApp({
   serviceAccount: JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY!),
-  projectId: process.env.FIREBASE_PROJECT_ID
+  projectId: process.env.FIREBASE_PROJECT_ID,
+
+  // use for local development
+  authEmulatorHost: process.env.FIREBASE_AUTH_EMULATOR_HOST,
+  firestoreEmulatorHost: process.env.FIREBASE_FIRESTORE_EMULATOR_HOST,
+  storageEmulatorHost: process.env.FIREBASE_STORAGE_EMULATOR_HOST,
 });
 
 // Option 2: Auto-detect from process.env (no initialization needed)
@@ -78,7 +83,16 @@ initializeApp({
 ```env
 FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
 FIREBASE_PROJECT_ID=your-project-id
+
+# use for local development
+FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
+FIREBASE_FIRESTORE_EMULATOR_HOST=localhost:8080
+FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
+
+**Note:**
+If a particular emulator setting is provided it will override the production setting. So make sure you have all of the emulator environment variables and `initializeApp()` settings are unset before deploying to production. 
+
 
 ### 2. Verify ID Tokens
 
