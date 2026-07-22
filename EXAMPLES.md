@@ -532,3 +532,39 @@ async function bulkUpdateUsers(userIds: string[], updates: any) {
   }
 }
 ```
+
+### Use Firebase Emulators For Local Development
+Init your Firebase Emulators: 
+```bash
+firebase init emulators
+# > select Firestore, Authentication, and/or Storage when asked
+```
+
+Then start the emulators: 
+```bash
+firebase emulators:start
+```
+
+Initialize your app with emulators:
+```typescript
+import { initializeApp } from '@prmichaelsen/firebase-admin-sdk-v8';
+
+const authPort = 9099;
+const firestorePort = 8080;
+const storagePort = 9199;
+const emuHost = '127.0.0.1';
+
+const firebaseApp = initializeApp({
+  projectId: 'your-project-id',
+  apiKey: 'your-api-key',
+  authEmulatorHost: `${emuHost}:${authPort}`,
+  firestoreEmulatorHost: `${emuHost}:${firestorePort}`,
+  storageEmulatorHost: `${emuHost}:${storagePort}`
+});
+```
+
+Firebase will now point to the emulators instead of the production Firebase services.
+
+**Note**:
+- `projectId` is required when you use any of the emulators. It can be any string
+- `apiKey` is not required unless you plan on using one of the calls that requires an api key when you use any of the emulators. It can be any string

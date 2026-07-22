@@ -19,6 +19,7 @@ import {
   listUsers,
   setCustomUserClaims,
   generatePasswordResetLink,
+  generateEmailVerificationLink,
 } from './user-management';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -285,29 +286,32 @@ describe('User Management E2E Tests', () => {
   });
 
   describe('generatePasswordResetLink', () => {
-    let resetTestUserId: string;
-    const resetTestEmail = `reset-test-${Date.now()}@example.com`;
+    let user1Id: string;
+    let user2Id: string;
+    const email1 = `reset-test-1-${Date.now()}@example.com`;
+    const email2 = `reset-test-2-${Date.now()}@example.com`;
 
     beforeAll(async () => {
-      const user = await createUser({
-        email: resetTestEmail,
-        password: 'ResetTest123!',
-      });
-      resetTestUserId = user.uid;
+      const user1 = await createUser({ email: email1, password: 'ResetTest123!' });
+      user1Id = user1.uid;
+      const user2 = await createUser({ email: email2, password: 'ResetTest123!' });
+      user2Id = user2.uid;
     });
 
     afterAll(async () => {
-      if (resetTestUserId) {
-        try {
-          await deleteUser(resetTestUserId);
-        } catch {
-          // ignore
+      for (const id of [user1Id, user2Id]) {
+        if (id) {
+          try {
+            await deleteUser(id);
+          } catch {
+            // ignore
+          }
         }
       }
     });
 
     it('should generate a password reset link for an existing user', async () => {
-      const link = await generatePasswordResetLink(resetTestEmail);
+      const link = await generatePasswordResetLink(email1);
 
       expect(link).toBeDefined();
       expect(typeof link).toBe('string');
@@ -315,7 +319,7 @@ describe('User Management E2E Tests', () => {
     });
 
     it('should generate a password reset link with actionCodeSettings', async () => {
-      const link = await generatePasswordResetLink(resetTestEmail, {
+      const link = await generatePasswordResetLink(email2, {
         url: `https://${getServiceAccount().project_id}.firebaseapp.com/continue`,
       });
 
@@ -328,6 +332,57 @@ describe('User Management E2E Tests', () => {
     it('should throw error for non-existent email', async () => {
       await expect(
         generatePasswordResetLink(`nonexistent-${Date.now()}@example.com`)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('generateEmailVerificationLink', () => {
+    let user1Id: string;
+    let user2Id: string;
+    const email1 = `email-test-1-${Date.now()}@example.com`;
+    const email2 = `email-test-2-${Date.now()}@example.com`;
+
+    beforeAll(async () => {
+      const user1 = await createUser({ email: email1, password: 'EmailTest123!' });
+      user1Id = user1.uid;
+      const user2 = await createUser({ email: email2, password: 'EmailTest123!' });
+      user2Id = user2.uid;
+    });
+
+    afterAll(async () => {
+      for (const id of [user1Id, user2Id]) {
+        if (id) {
+          try {
+            await deleteUser(id);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    });
+
+    it('should generate a email verification link for an existing user', async () => {
+      const link = await generateEmailVerificationLink(email1);
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+    });
+
+    it('should generate a email verification link with actionCodeSettings', async () => {
+      const link = await generateEmailVerificationLink(email2, {
+        url: `https://${getServiceAccount().project_id}.firebaseapp.com/continue`,
+      });
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+      expect(link).toContain('continueUrl');
+    });
+
+    it('should throw error for non-existent email', async () => {
+      await expect(
+        generateEmailVerificationLink(`nonexistent-${Date.now()}@example.com`)
       ).rejects.toThrow();
     });
   });
@@ -686,6 +741,54 @@ const emuRunning = process?.env?.AUTH_EMULATOR_RUNNING === 'true';
     it('should throw error for non-existent email', async () => {
       await expect(
         generatePasswordResetLink(`nonexistent-${Date.now()}@example.com`)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('generateEmailVerificationLink', () => {
+    let resetTestUserId: string;
+    const resetTestEmail = `email-test-${Date.now()}@example.com`;
+
+    beforeAll(async () => {
+      const user = await createUser({
+        email: resetTestEmail,
+        password: 'EmailTest123!',
+      });
+      resetTestUserId = user.uid;
+    });
+
+    afterAll(async () => {
+      if (resetTestUserId) {
+        try {
+          await deleteUser(resetTestUserId);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    it('should generate a email verification link for an existing user', async () => {
+      const link = await generateEmailVerificationLink(resetTestEmail);
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+    });
+
+    it('should generate a email verification link with actionCodeSettings', async () => {
+      const link = await generateEmailVerificationLink(resetTestEmail, {
+        url: 'http://127.0.0.1:4200/continue',
+      });
+
+      expect(link).toBeDefined();
+      expect(typeof link).toBe('string');
+      expect(link).toContain('oobCode');
+      expect(link).toContain('continueUrl');
+    });
+
+    it('should throw error for non-existent email', async () => {
+      await expect(
+        generateEmailVerificationLink(`nonexistent-${Date.now()}@example.com`)
       ).rejects.toThrow();
     });
   });

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-07-22
+### Added
+- **Emulator Support**: Added support for Firestore, Auth, and Storage emulators
+  - `authEmulatorHost` in `initializeApp()` config for Auth emulator
+  - `firestoreEmulatorHost` in `initializeApp()` config for Firestore emulator
+  - `storageEmulatorHost` in `initializeApp()` config for Storage emulator
+  - `process.env.FIREBASE_FIRESTORE_EMULATOR_HOST` for Firestore emulator if not defined in `initializeApp()` config
+  - `process.env.FIREBASE_AUTH_EMULATOR_HOST` for Auth emulator if not defined in `initializeApp()` config
+  - `process.env.FIREBASE_STORAGE_EMULATOR_HOST` for Storage emulator if not defined in `initializeApp()` config
+  - unit and e2e tests for emulated functions
+- **generateEmailVerificationLink**: Generate email verification links for when a users signs up
+  - `generateEmailVerificationLink(email, actionCodeSettings?)` - Generate out-of-band email verification link
+  - Supports `ActionCodeSettings` for custom continue URLs, mobile deep linking (iOS/Android), and custom hosting domains
+  - Returns the OOB link for sending via custom email delivery
+  - unit and e2e tests for emulated Auth and Unemulated Auth
+
 ## [2.9.0] - 2026-03-19
 
 ### Added

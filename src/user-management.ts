@@ -458,3 +458,51 @@ export async function generatePasswordResetLink(
 
   return data.oobLink;
 }
+
+export async function generateEmailVerificationLink(
+  email: string,
+  actionCodeSettings?: ActionCodeSettings
+): Promise<string> {
+  if (!email || typeof email !== 'string') {
+    throw new Error('email must be a non-empty string');
+  }
+
+  const projectId = getProjectId();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
+
+  const requestBody: Record<string, any> = {
+    requestType: 'VERIFY_EMAIL',
+    email,
+    returnOobLink: true,
+  };
+
+  if (actionCodeSettings) {
+    Object.assign(requestBody, buildActionCodeSettingsRequest(actionCodeSettings));
+  }
+
+  const response = await fetch(
+    getUrl(`/projects/${projectId}/accounts:sendOobCode`),
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to generate email verification link: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.oobLink) {
+    throw new Error('Email verification link not returned by server');
+  }
+
+  return data.oobLink;
+}

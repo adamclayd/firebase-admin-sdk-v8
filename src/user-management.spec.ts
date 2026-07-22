@@ -11,6 +11,7 @@ import {
   listUsers,
   setCustomUserClaims,
   generatePasswordResetLink,
+  generateEmailVerificationLink,
 } from './user-management';
 import * as config from './config';
 import * as tokenGeneration from './token-generation';
@@ -686,6 +687,109 @@ describe('User Management', () => {
 
       await expect(generatePasswordResetLink('test@example.com')).rejects.toThrow(
         'Password reset link not returned by server'
+      );
+    });
+  });
+
+  describe('generateEmailVerificationLink', () => {
+    it('should generate password reset link successfully', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      const result = await generateEmailVerificationLink('test@example.com');
+
+      expect(result).toBe('https://example.com/reset?oobCode=abc123');
+      expect(global.fetch).toHaveBeenCalledWith(
+        `https://identitytoolkit.googleapis.com/v1/projects/test-project/accounts:sendOobCode`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer mock-access-token',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requestType: 'VERIFY_EMAIL',
+            email: 'test@example.com',
+            returnOobLink: true,
+          }),
+        }
+      );
+    });
+
+    it('should include actionCodeSettings in request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      await generateEmailVerificationLink('test@example.com', {
+        url: 'https://example.com/continue',
+        handleCodeInApp: true,
+        iOS: { bundleId: 'com.example.ios' },
+        android: {
+          packageName: 'com.example.android',
+          installApp: true,
+          minimumVersion: '12',
+        },
+        dynamicLinkDomain: 'example.page.link',
+        linkDomain: 'project.firebaseapp.com',
+      });
+
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
+      expect(callBody.continueUrl).toBe('https://example.com/continue');
+      expect(callBody.canHandleCodeInApp).toBe(true);
+      expect(callBody.iOSBundleId).toBe('com.example.ios');
+      expect(callBody.androidPackageName).toBe('com.example.android');
+      expect(callBody.androidInstallApp).toBe(true);
+      expect(callBody.androidMinimumVersion).toBe('12');
+      expect(callBody.dynamicLinkDomain).toBe('example.page.link');
+      expect(callBody.linkDomain).toBe('project.firebaseapp.com');
+    });
+
+    it('should work without actionCodeSettings', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      await generateEmailVerificationLink('test@example.com');
+
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
+      expect(callBody.continueUrl).toBeUndefined();
+      expect(callBody.canHandleCodeInApp).toBeUndefined();
+    });
+
+    it('should throw error for invalid email', async () => {
+      await expect(generateEmailVerificationLink('')).rejects.toThrow(
+        'email must be a non-empty string'
+      );
+      await expect(generateEmailVerificationLink(null as any)).rejects.toThrow(
+        'email must be a non-empty string'
+      );
+    });
+
+    it('should throw error on API failure', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => 'EMAIL_NOT_FOUND',
+      });
+
+      await expect(generateEmailVerificationLink('nonexistent@example.com')).rejects.toThrow(
+        'Failed to generate email verification link: 400 EMAIL_NOT_FOUND'
+      );
+    });
+
+    it('should throw error when oobLink is missing from response', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await expect(generateEmailVerificationLink('test@example.com')).rejects.toThrow(
+        'Email verification link not returned by server'
       );
     });
   });
@@ -1424,6 +1528,109 @@ describe('User Management Emulator', () => {
 
       await expect(generatePasswordResetLink('test@example.com')).rejects.toThrow(
         'Password reset link not returned by server'
+      );
+    });
+  });
+
+  describe('generateEmailVerificationLink', () => {
+    it('should generate password reset link successfully', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      const result = await generateEmailVerificationLink('test@example.com');
+
+      expect(result).toBe('https://example.com/reset?oobCode=abc123');
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/identitytoolkit.googleapis.com/v1/projects/test-project/accounts:sendOobCode`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer mock-access-token',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requestType: 'VERIFY_EMAIL',
+            email: 'test@example.com',
+            returnOobLink: true,
+          }),
+        }
+      );
+    });
+
+    it('should include actionCodeSettings in request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      await generateEmailVerificationLink('test@example.com', {
+        url: 'https://example.com/continue',
+        handleCodeInApp: true,
+        iOS: { bundleId: 'com.example.ios' },
+        android: {
+          packageName: 'com.example.android',
+          installApp: true,
+          minimumVersion: '12',
+        },
+        dynamicLinkDomain: 'example.page.link',
+        linkDomain: 'project.firebaseapp.com',
+      });
+
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
+      expect(callBody.continueUrl).toBe('https://example.com/continue');
+      expect(callBody.canHandleCodeInApp).toBe(true);
+      expect(callBody.iOSBundleId).toBe('com.example.ios');
+      expect(callBody.androidPackageName).toBe('com.example.android');
+      expect(callBody.androidInstallApp).toBe(true);
+      expect(callBody.androidMinimumVersion).toBe('12');
+      expect(callBody.dynamicLinkDomain).toBe('example.page.link');
+      expect(callBody.linkDomain).toBe('project.firebaseapp.com');
+    });
+
+    it('should work without actionCodeSettings', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ oobLink: 'https://example.com/reset?oobCode=abc123' }),
+      });
+
+      await generateEmailVerificationLink('test@example.com');
+
+      const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[ 0 ][ 1 ].body);
+      expect(callBody.continueUrl).toBeUndefined();
+      expect(callBody.canHandleCodeInApp).toBeUndefined();
+    });
+
+    it('should throw error for invalid email', async () => {
+      await expect(generateEmailVerificationLink('')).rejects.toThrow(
+        'email must be a non-empty string'
+      );
+      await expect(generateEmailVerificationLink(null as any)).rejects.toThrow(
+        'email must be a non-empty string'
+      );
+    });
+
+    it('should throw error on API failure', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => 'EMAIL_NOT_FOUND',
+      });
+
+      await expect(generateEmailVerificationLink('nonexistent@example.com')).rejects.toThrow(
+        'Failed to generate email verification link: 400 EMAIL_NOT_FOUND'
+      );
+    });
+
+    it('should throw error when oobLink is missing from response', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await expect(generateEmailVerificationLink('test@example.com')).rejects.toThrow(
+        'Email verification link not returned by server'
       );
     });
   });
