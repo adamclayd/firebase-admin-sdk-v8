@@ -2,13 +2,12 @@
 
 > Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs
 
-[![npm version](https://img.shields.io/npm/v/@prmichaelsen/firebase-admin-sdk-v8.svg)](https://www.npmjs.com/package/@prmichaelsen/firebase-admin-sdk-v8)
+[![npm version](badges/firebase-admin-sdk-v8.svg)](badges/firebase-admin-sdk-v8)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Unit Tests](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/test.yml/badge.svg)](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/test.yml)
-[![E2E Tests](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/prmichaelsen/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml)
-[![codecov](https://codecov.io/gh/prmichaelsen/firebase-admin-sdk-v8/branch/mainline/graph/badge.svg)](https://codecov.io/gh/prmichaelsen/firebase-admin-sdk-v8)
+[![Unit Tests](badges/unit-tests.svg)](https://github.com/adamclayd/firebase-admin-sdk-v8/actions/workflows/test.yml)
+[![E2E Tests](badges/e2e-tests.svg)](https://github.com/adamclayd/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml)
 
-This library provides Firebase Admin SDK functionality for Cloudflare Workers and other edge runtimes. It uses REST APIs and JWT token generation instead of the Node.js Admin SDK, making it compatible with environments that don't support Node.js.
+This library provides Firebase Admin SDK functionality for Cloudflare Workers and other edge runtimes. It uses REST APIs and JWT token generation instead of the Node.js Admin SDK, making it compatible with environments that don't support Node.js. You can use the Firebase emulators with the supported APIs with this fork of firebase-admin-sdk-v8.
 
 ## ✨ Features
 
@@ -26,11 +25,12 @@ This library provides Firebase Admin SDK functionality for Cloudflare Workers an
 - ✅ **OAuth Access Tokens** - Generate admin API access tokens
 - ✅ **Token Caching** - Automatic token refresh before expiry
 - ✅ **TypeScript** - Full type definitions included
+- ✅ **Emulators** - Use with Firebase emulators for local development
 
 ## 📦 Installation
 
 ```bash
-npm install @prmichaelsen/firebase-admin-sdk-v8
+npm install @intuitive-perception/firebase-admin-sdk-v8
 ```
 
 ## 🚀 Quick Start
@@ -40,7 +40,7 @@ npm install @prmichaelsen/firebase-admin-sdk-v8
 **Option A: Cloudflare Workers / Edge Runtimes (Recommended)**
 
 ```typescript
-import { initializeApp, verifyIdToken } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { initializeApp, verifyIdToken } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -62,7 +62,7 @@ export default {
 **Option B: Node.js / Traditional Environments**
 
 ```typescript
-import { initializeApp } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 // Option 1: Explicit initialization
 initializeApp({
@@ -83,7 +83,7 @@ FIREBASE_PROJECT_ID=your-project-id
 ### 2. Verify ID Tokens
 
 ```typescript
-import { verifyIdToken, getUserFromToken } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { verifyIdToken, getUserFromToken } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 const authHeader = request.headers.get('authorization');
 const idToken = authHeader?.split('Bearer ')[1];
@@ -99,7 +99,7 @@ try {
 ### 3. Session Cookies (Long-Lived Sessions)
 
 ```typescript
-import { createSessionCookie, verifySessionCookie } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { createSessionCookie, verifySessionCookie } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 // Create 14-day session cookie from ID token
 const sessionCookie = await createSessionCookie(idToken, {
@@ -118,7 +118,7 @@ const user = await verifySessionCookie(cookie);
 ### 4. Basic Firestore Operations
 
 ```typescript
-import { setDocument, getDocument, updateDocument, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { setDocument, getDocument, updateDocument, FieldValue } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 // Set a document (create or overwrite)
 await setDocument('users', 'user123', {
@@ -140,7 +140,7 @@ await updateDocument('users', 'user123', {
 ### 4. Advanced Queries
 
 ```typescript
-import { queryDocuments } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { queryDocuments } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 const activeUsers = await queryDocuments('users', {
   where: [
@@ -155,6 +155,31 @@ const activeUsers = await queryDocuments('users', {
 ## 📚 API Reference
 
 ### Authentication
+
+#### Configure For Production Or Local Emulators
+```typescript
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
+
+// For local emulators
+initializeApp({
+  authEmulatorHost: env.FIREBASE_AUTH_EMULATOR_HOST, // 127.0.0.1:9099
+  projectId: env.FIREBASE_PROJECT_ID,  // test-project-id
+  apiKey: env.FIREBASE_API_KEY // test-api-key
+});
+
+// For production
+initializeApp({
+  serviceAccount: JSON.parse(env.FIREBASE_SERVICE_ACCOUNT),
+  projectId: env.FIREBASE_PROJECT_ID,
+  apiKey: env.FIREBASE_API_KEY
+});
+```
+* **Notes For Emulator:**
+  * Your Authentication URLs will point the emulator instead of the production Firebase Auth service.
+  * If you have the emulator configured it will override the production settings.
+  * `projectId` is required for the emulator to work. It can be any string. Just make sure the ones on your frontend match the ones on the backend
+  * `apiKey` is not required unless you plan to use a call like like `signInWithCustomToken` that requires an API key. It can be any string. Just make sure the frontend API key match the ones on the backend
+  * `authEmulatorHost` will fall back to `FIREBASE_AUTH_EMULATOR_HOST` environment variable if not provided or undefined.
 
 #### `verifyIdToken(idToken: string): Promise<DecodedIdToken>`
 
@@ -266,6 +291,28 @@ await setCustomUserClaims('user123', null);
 ```
 
 ### Firestore - Basic Operations
+
+#### Configure For Production Or Local Emulators
+```typescript
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
+
+// For local emulators
+initializeApp({
+  firestoreEmulatorHost: env.FIRESTORE_EMULATOR_HOST, // 127.0.0.1:8080
+  projectId: env.FIREBASE_PROJECT_ID,  // test-project-id
+});
+
+// For production
+initializeApp({
+  serviceAccount: JSON.parse(env.FIREBASE_SERVICE_ACCOUNT),
+  projectId: env.FIREBASE_PROJECT_ID,
+});
+```
+* **Notes For Emulator:**
+  * Your Firestore URLs will point the emulator instead of the production Firebase Firestore service.
+  * If you have the emulator configured it will override the production settings.
+  * `projectId` is required for the emulator to work. It can be any string. Just make sure the ones on your frontend match the ones on the backend
+  * `firestoreEmulatorHost` will fall back to `FIREBASE_FIRESTORE_EMULATOR_HOST` environment variable if not provided or undefined.
 
 #### `setDocument(collectionPath, documentId, data, options?): Promise<void>`
 
@@ -448,12 +495,16 @@ await batchWrite([
 
 ### Token Generation
 
-#### `getAdminAccessToken(): Promise<string>`
+#### `getAdminAccessToken(emulated: boolean = false): Promise<string>`
 
 Get an OAuth access token for Firebase Admin API. Automatically cached and refreshed.
 
 ```typescript
+// if your are on the production environment
 const token = await getAdminAccessToken();
+
+// if your are on the emulator environment
+const token = await getAdminAccessToken(true);
 ```
 
 #### `clearTokenCache(): void`
@@ -465,6 +516,28 @@ clearTokenCache();
 ```
 
 ### Storage - Resumable Uploads
+
+#### Configure For Production Or Local Emulators
+```typescript
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
+
+// For local emulators
+initializeApp({
+  storageEmulatorHost: env.FIREBASE_STORAGE_EMULATOR_HOST, // 127.0.0.1:9099
+  projectId: env.FIREBASE_PROJECT_ID,  // test-project-id
+});
+
+// For production
+initializeApp({
+  serviceAccount: JSON.parse(env.FIREBASE_SERVICE_ACCOUNT),
+  projectId: env.FIREBASE_PROJECT_ID,
+});
+```
+* **Notes For Emulator:**
+  * Your Storage URLs will point the emulator instead of the production Firebase Storage service.
+  * If you have the emulator configured it will override the production settings.
+  * `projectId` is required for the emulator to work. It can be any string. Just make sure the ones on your frontend match the ones on the backend
+  * `storageEmulatorHost` will fall back to `FIREBASE_STORAGE_EMULATOR_HOST` environment variable if not provided or undefined.
 
 #### `uploadFileResumable(bucket, path, data, contentType, options?): Promise<FileMetadata>`
 
@@ -478,7 +551,7 @@ Upload large files with resumable upload support. Suitable for files >10MB, unre
 - ✅ Automatic retry on chunk failure
 
 ```typescript
-import { uploadFileResumable } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { uploadFileResumable } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 // Upload large file with progress tracking
 const data = await fetch('https://example.com/large-video.mp4');
@@ -594,7 +667,7 @@ export default {
 ### Leaderboard Example
 
 ```typescript
-import { queryDocuments, updateDocument, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { queryDocuments, updateDocument, FieldValue } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 async function getTopPlayers(limit = 10) {
   return await queryDocuments('players', {
@@ -615,7 +688,7 @@ async function updatePlayerScore(playerId: string, points: number) {
 ### Bulk Operations Example
 
 ```typescript
-import { batchWrite, FieldValue } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { batchWrite, FieldValue } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 async function bulkUpdateUsers(userIds: string[], updates: any) {
   const operations = userIds.map(userId => ({
@@ -810,7 +883,7 @@ admin.firestore().collection('users').doc('user123')
   });
 
 // Use this library for CRUD in edge functions
-import { getDocument } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { getDocument } from '@intuitive-perception/firebase-admin-sdk-v8';
 const doc = await getDocument('users', 'user123');
 ```
 

@@ -10,13 +10,10 @@
       "enabled": true,
       "port": 4000
     },
-    "singleProjectMode": true,
+    "singleProjectMode": false,
     "storage": {
       "port": 9199
     }
-  },
-  "projects": {
-    "default": "prmichaelsen-firebase-e2e"
   },
   "firestore": {
     "rules": "firestore.rules",

@@ -29,6 +29,7 @@ service-account.json
 firebase.json
 firestore.rules
 firestore.indexes.json
+.firebaserc
 
 # Logs
 *.log
