@@ -2,7 +2,7 @@
 
 > Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs
 
-[![npm version](badges/firebase-admin-sdk-v8.svg)](badges/firebase-admin-sdk-v8)
+[![npm version](badges/npm-version.svg)](https://www.npmjs.com/package/@intuitive-perception/firebase-admin-sdk-v8)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unit Tests](badges/unit-tests.svg)](https://github.com/adamclayd/firebase-admin-sdk-v8/actions/workflows/test.yml)
 [![E2E Tests](badges/e2e-tests.svg)](https://github.com/adamclayd/firebase-admin-sdk-v8/actions/workflows/e2e-tests.yml)
