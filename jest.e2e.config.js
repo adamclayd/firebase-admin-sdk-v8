@@ -4,7 +4,7 @@ module.exports = {
   testMatch: ['**/*.e2e.ts'],
   testTimeout: 30000, // 30 seconds for real API calls
   roots: ['<rootDir>/src'],
-  globalSetup: '<rootDir>/jest.e2e.setup.ts',
+  globalSetup: '<rootDir>/jest.e2e.setup.js',
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.spec.ts',

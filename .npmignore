@@ -13,7 +13,8 @@ tsconfig.json
 coverage/
 .nyc_output/
 jest.config.js
-jest.e2e.config.js
+jest.e2e.config.jsnpm
+jest.e2e.setup.js
 
 # Documentation (keep README.md)
 agent/
