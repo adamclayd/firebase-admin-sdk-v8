@@ -1,33 +1,33 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "e2e-tests",
-      "queryScope": "COLLECTION",
-      "fields": [
+    "indexes": [
         {
-          "fieldPath": "_test",
-          "order": "ASCENDING"
+            "collectionGroup": "e2e-tests",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "_test",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "age",
+                    "order": "ASCENDING"
+                }
+            ]
         },
         {
-          "fieldPath": "age",
-          "order": "ASCENDING"
+            "collectionGroup": "messages",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "_test",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "timestamp",
+                    "order": "ASCENDING"
+                }
+            ]
         }
-      ]
-    },
-    {
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "_test",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        }
-      ]
-    }
-  ],
-  "fieldOverrides": []
+    ],
+    "fieldOverrides": []
 }

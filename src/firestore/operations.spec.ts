@@ -17,10 +17,12 @@ import {
 import { FieldValue } from '../field-value';
 import * as tokenGeneration from '../token-generation';
 import * as serviceAccount from '../service-account';
+import * as config from '../config';
 
 // Mock dependencies
 jest.mock('../token-generation');
 jest.mock('../service-account');
+jest.mock('../config');
 
 const mockGetAdminAccessToken = tokenGeneration.getAdminAccessToken as jest.MockedFunction<typeof tokenGeneration.getAdminAccessToken>;
 const mockGetProjectId = serviceAccount.getProjectId as jest.MockedFunction<typeof serviceAccount.getProjectId>;
@@ -32,11 +34,11 @@ describe('Firestore Operations', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Setup default mock implementations
     mockGetAdminAccessToken.mockResolvedValue(TEST_TOKEN);
     mockGetProjectId.mockReturnValue(TEST_PROJECT);
-    
+
     // Mock global fetch
     global.fetch = jest.fn();
   });
@@ -92,8 +94,8 @@ describe('Firestore Operations', () => {
         active: true,
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
       expect(body.fields).toEqual({
         name: { stringValue: 'John' },
@@ -122,7 +124,7 @@ describe('Firestore Operations', () => {
         json: async () => ({}),
       });
 
-      await setDocument('users', 'user123', { age: 31, city: 'NYC' }, { mergeFields: ['age'] });
+      await setDocument('users', 'user123', { age: 31, city: 'NYC' }, { mergeFields: [ 'age' ] });
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('updateMask.fieldPaths=age'),
@@ -148,12 +150,12 @@ describe('Firestore Operations', () => {
         })
       );
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
       expect(body.writes).toBeDefined();
-      expect(body.writes[0].updateTransforms).toBeDefined();
-      expect(body.writes[0].updateTransforms[0].setToServerValue).toBe('REQUEST_TIME');
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
     });
 
     it('should handle transforms with merge option', async () => {
@@ -167,11 +169,11 @@ describe('Firestore Operations', () => {
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
-      expect(body.writes[0].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
     });
 
     it('should handle transforms with mergeFields option', async () => {
@@ -184,13 +186,13 @@ describe('Firestore Operations', () => {
         name: 'John',
         age: 30,
         updatedAt: FieldValue.serverTimestamp(),
-      }, { mergeFields: ['name', 'age'] });
+      }, { mergeFields: [ 'name', 'age' ] });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name', 'age'] });
-      expect(body.writes[0].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name', 'age' ] });
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
     });
 
     it('should throw error on failed request', async () => {
@@ -338,7 +340,7 @@ describe('Firestore Operations', () => {
 
       await updateDocument('users', 'user123', { age: 31, city: 'NYC' });
 
-      const url = (global.fetch as jest.Mock).mock.calls[0][0];
+      const url = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
       expect(url).toContain('updateMask.fieldPaths=age');
       expect(url).toContain('updateMask.fieldPaths=city');
     });
@@ -360,11 +362,11 @@ describe('Firestore Operations', () => {
         })
       );
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].transform).toBeDefined();
-      expect(body.writes[0].transform.fieldTransforms[0].increment).toBeDefined();
+      expect(body.writes[ 0 ].transform).toBeDefined();
+      expect(body.writes[ 0 ].transform.fieldTransforms[ 0 ].increment).toBeDefined();
     });
 
     it('should use :commit API for mixed updates (fields + transforms)', async () => {
@@ -383,11 +385,11 @@ describe('Firestore Operations', () => {
         expect.any(Object)
       );
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].update).toBeDefined();
-      expect(body.writes[0].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
     });
 
     it('should handle deleteField in updateMask', async () => {
@@ -401,7 +403,7 @@ describe('Firestore Operations', () => {
         oldField: FieldValue.delete(),
       });
 
-      const url = (global.fetch as jest.Mock).mock.calls[0][0];
+      const url = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
       expect(url).toContain('updateMask.fieldPaths=name');
       expect(url).toContain('updateMask.fieldPaths=oldField');
     });
@@ -542,12 +544,12 @@ describe('Firestore Operations', () => {
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
       expect(body.transforms).toBeDefined();
-      expect(body.transforms[0].fieldPath).toBe('createdAt');
-      expect(body.transforms[0].setToServerValue).toBe('REQUEST_TIME');
+      expect(body.transforms[ 0 ].fieldPath).toBe('createdAt');
+      expect(body.transforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
     });
 
     it('should throw error on failed request', async () => {
@@ -582,10 +584,10 @@ describe('Firestore Operations', () => {
       const results = await queryDocuments('users');
 
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe('user1');
-      expect(results[0].data.name).toBe('John');
-      expect(results[1].id).toBe('user2');
-      expect(results[1].data.name).toBe('Jane');
+      expect(results[ 0 ].id).toBe('user1');
+      expect(results[ 0 ].data.name).toBe('John');
+      expect(results[ 1 ].id).toBe('user2');
+      expect(results[ 1 ].data.name).toBe('Jane');
     });
 
     it('should use :runQuery for queries with options', async () => {
@@ -602,7 +604,7 @@ describe('Firestore Operations', () => {
       });
 
       await queryDocuments('users', {
-        where: [{ field: 'age', op: '>=', value: 18 }],
+        where: [ { field: 'age', op: '>=', value: 18 } ],
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -620,7 +622,7 @@ describe('Firestore Operations', () => {
       });
 
       await queryDocuments('users/uid123/posts', {
-        where: [{ field: 'published', op: '==', value: true }],
+        where: [ { field: 'published', op: '==', value: true } ],
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -636,15 +638,15 @@ describe('Firestore Operations', () => {
       });
 
       await queryDocuments('users', {
-        where: [{ field: 'age', op: '>=', value: 18 }],
+        where: [ { field: 'age', op: '>=', value: 18 } ],
         limit: 10,
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
       expect(body.structuredQuery).toBeDefined();
-      expect(body.structuredQuery.from[0].collectionId).toBe('users');
+      expect(body.structuredQuery.from[ 0 ].collectionId).toBe('users');
       expect(body.structuredQuery.limit).toBe(10);
     });
 
@@ -665,11 +667,11 @@ describe('Firestore Operations', () => {
       });
 
       const results = await queryDocuments('users', {
-        where: [{ field: 'active', op: '==', value: true }],
+        where: [ { field: 'active', op: '==', value: true } ],
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe('user1');
+      expect(results[ 0 ].id).toBe('user1');
     });
 
     it('should throw error on failed request', async () => {
@@ -709,53 +711,53 @@ describe('Firestore Operations', () => {
     it('should handle set operations', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
         { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].update).toBeDefined();
-      expect(body.writes[0].update.fields.name.stringValue).toBe('John');
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].update.fields.name.stringValue).toBe('John');
     });
 
     it('should handle update operations', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
         { type: 'update', collectionPath: 'users', documentId: 'user1', data: { age: 31 } },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].update).toBeDefined();
-      expect(body.writes[0].updateMask).toBeDefined();
-      expect(body.writes[0].currentDocument.exists).toBe(true);
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].updateMask).toBeDefined();
+      expect(body.writes[ 0 ].currentDocument.exists).toBe(true);
     });
 
     it('should handle delete operations', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
         { type: 'delete', collectionPath: 'users', documentId: 'user1' },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].delete).toBeDefined();
-      expect(body.writes[0].delete).toContain('/users/user1');
+      expect(body.writes[ 0 ].delete).toBeDefined();
+      expect(body.writes[ 0 ].delete).toContain('/users/user1');
     });
 
     it('should handle multiple operations', async () => {
@@ -776,8 +778,8 @@ describe('Firestore Operations', () => {
         { type: 'delete', collectionPath: 'users', documentId: 'user3' },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
       expect(body.writes).toHaveLength(3);
     });
@@ -785,7 +787,7 @@ describe('Firestore Operations', () => {
     it('should handle transforms in batch operations', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
@@ -800,17 +802,17 @@ describe('Firestore Operations', () => {
         },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateTransforms).toBeDefined();
-      expect(body.writes[0].updateTransforms[0].setToServerValue).toBe('REQUEST_TIME');
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
     });
 
     it('should handle set with merge option in batch', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
@@ -823,16 +825,16 @@ describe('Firestore Operations', () => {
         },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
     });
 
     it('should handle set with mergeFields option in batch', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
@@ -841,20 +843,20 @@ describe('Firestore Operations', () => {
           collectionPath: 'users',
           documentId: 'user1',
           data: { name: 'John', age: 30 },
-          options: { mergeFields: ['name'] },
+          options: { mergeFields: [ 'name' ] },
         },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateMask).toEqual({ fieldPaths: ['name'] });
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
     });
 
     it('should handle update with transforms in batch', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ writeResults: [{ updateTime: '2024-01-01T00:00:00Z' }] }),
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
       });
 
       await batchWrite([
@@ -869,11 +871,11 @@ describe('Firestore Operations', () => {
         },
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
 
-      expect(body.writes[0].updateTransforms).toBeDefined();
-      expect(body.writes[0].updateTransforms[0].increment.integerValue).toBe('1');
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].increment.integerValue).toBe('1');
     });
 
     it('should throw error for unknown operation type', async () => {
@@ -918,9 +920,9 @@ describe('Firestore Operations', () => {
         ]),
       });
 
-      const result = await getAll('users', ['user1']);
+      const result = await getAll('users', [ 'user1' ]);
 
-      expect(result).toEqual([{ name: 'Alice' }]);
+      expect(result).toEqual([ { name: 'Alice' } ]);
       expect(global.fetch).toHaveBeenCalledWith(
         `https://firestore.googleapis.com/v1/${basePath}:batchGet`,
         expect.objectContaining({
@@ -929,7 +931,7 @@ describe('Firestore Operations', () => {
             'Authorization': `Bearer ${TEST_TOKEN}`,
           }),
           body: JSON.stringify({
-            documents: [`${basePath}/users/user1`],
+            documents: [ `${basePath}/users/user1` ],
           }),
         })
       );
@@ -958,9 +960,9 @@ describe('Firestore Operations', () => {
         ]),
       });
 
-      const result = await getAll('users', ['user1', 'user2']);
+      const result = await getAll('users', [ 'user1', 'user2' ]);
 
-      expect(result).toEqual([{ name: 'Alice' }, { name: 'Bob' }]);
+      expect(result).toEqual([ { name: 'Alice' }, { name: 'Bob' } ]);
     });
 
     it('should return null for missing documents', async () => {
@@ -989,9 +991,9 @@ describe('Firestore Operations', () => {
         ]),
       });
 
-      const result = await getAll('users', ['user1', 'user2', 'user3']);
+      const result = await getAll('users', [ 'user1', 'user2', 'user3' ]);
 
-      expect(result).toEqual([{ name: 'Alice' }, null, { name: 'Charlie' }]);
+      expect(result).toEqual([ { name: 'Alice' }, null, { name: 'Charlie' } ]);
     });
 
     it('should reorder results to match input order', async () => {
@@ -1026,7 +1028,7 @@ describe('Firestore Operations', () => {
         ]),
       });
 
-      const result = await getAll('users', ['user1', 'user2', 'user3']);
+      const result = await getAll('users', [ 'user1', 'user2', 'user3' ]);
 
       // Should match input order, not API response order
       expect(result).toEqual([
@@ -1051,14 +1053,14 @@ describe('Firestore Operations', () => {
         ]),
       });
 
-      const result = await getAll('users/uid1/posts', ['post1']);
+      const result = await getAll('users/uid1/posts', [ 'post1' ]);
 
-      expect(result).toEqual([{ title: 'Hello' }]);
+      expect(result).toEqual([ { title: 'Hello' } ]);
       expect(global.fetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           body: JSON.stringify({
-            documents: [`${basePath}/users/uid1/posts/post1`],
+            documents: [ `${basePath}/users/uid1/posts/post1` ],
           }),
         })
       );
@@ -1070,7 +1072,7 @@ describe('Firestore Operations', () => {
         text: async () => JSON.stringify({ error: 'Permission denied' }),
       });
 
-      await expect(getAll('users', ['user1'])).rejects.toThrow('Failed to batch get documents');
+      await expect(getAll('users', [ 'user1' ])).rejects.toThrow('Failed to batch get documents');
     });
 
     it('should throw when more than 100 documents requested', async () => {
@@ -1108,13 +1110,13 @@ describe('Firestore Operations', () => {
         { collection: 'users/uid1/profile', id: 'default' },
       ]);
 
-      expect(result).toEqual([{ displayName: 'Alice' }]);
+      expect(result).toEqual([ { displayName: 'Alice' } ]);
       expect(global.fetch).toHaveBeenCalledWith(
         `https://firestore.googleapis.com/v1/${basePath}:batchGet`,
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
-            documents: [`${basePath}/users/uid1/profile/default`],
+            documents: [ `${basePath}/users/uid1/profile/default` ],
           }),
         })
       );
@@ -1177,7 +1179,1252 @@ describe('Firestore Operations', () => {
         { collection: 'users/uid2/profile', id: 'default' },
       ]);
 
-      expect(result).toEqual([{ displayName: 'Alice' }, null]);
+      expect(result).toEqual([ { displayName: 'Alice' }, null ]);
+    });
+
+    it('should reorder results to match input order', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/teams/team1`,
+              fields: { name: { stringValue: 'Engineering' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/uid1/profile/default`,
+              fields: { displayName: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAllByPaths([
+        { collection: 'users/uid1/profile', id: 'default' },
+        { collection: 'teams', id: 'team1' },
+      ]);
+
+      expect(result).toEqual([
+        { displayName: 'Alice' },
+        { name: 'Engineering' },
+      ]);
+    });
+
+    it('should throw when more than 100 documents requested', async () => {
+      const refs = Array.from({ length: 101 }, (_, i) => ({
+        collection: 'users',
+        id: `user${i}`,
+      }));
+      await expect(getAllByPaths(refs)).rejects.toThrow('getAllByPaths supports a maximum of 100 documents per request');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should throw on API error', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Permission denied' }),
+      });
+
+      await expect(getAllByPaths([
+        { collection: 'users', id: 'user1' },
+      ])).rejects.toThrow('Failed to batch get documents');
+    });
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Firestore Emulator Configuration Tests
+ */
+const mockGetFirestoreEmulatorHost = config.getFirestoreEmulatorHost as jest.MockedFunction<typeof config.getFirestoreEmulatorHost>;
+describe('Firestore Emulator Operations', () => {
+  const TEST_TOKEN = 'test-access-token';
+  const TEST_PROJECT = 'test-project-id';
+  const EMU_HOST = '127.0.0.1:8080';
+
+  beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks();
+
+    // Setup default mock implementations
+    mockGetAdminAccessToken.mockResolvedValue(TEST_TOKEN);
+    mockGetProjectId.mockReturnValue(TEST_PROJECT);
+    mockGetFirestoreEmulatorHost.mockReturnValue(EMU_HOST);
+    
+
+    // Mock global fetch
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('setDocument', () => {
+    it('should call correct URL for top-level collection', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', { name: 'John' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/projects/test-project-id/databases/(default)/documents/users/user123'),
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-access-token',
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
+    });
+
+    it('should call correct URL for subcollection', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users/uid123/posts', 'post456', { title: 'Test' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/users/uid123/posts/post456'),
+        expect.any(Object)
+      );
+    });
+
+    it('should convert data to Firestore format', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        age: 30,
+        active: true,
+      });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.fields).toEqual({
+        name: { stringValue: 'John' },
+        age: { integerValue: '30' },
+        active: { booleanValue: true },
+      });
+    });
+
+    it('should handle merge option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', { age: 31 }, { merge: true });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('updateMask.fieldPaths=age'),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle mergeFields option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', { age: 31, city: 'NYC' }, { mergeFields: [ 'age' ] });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('updateMask.fieldPaths=age'),
+        expect.any(Object)
+      );
+    });
+
+    it('should use :commit API when transforms are present', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(':commit'),
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
+    });
+
+    it('should handle transforms with merge option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+    });
+
+    it('should handle transforms with mergeFields option', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await setDocument('users', 'user123', {
+        name: 'John',
+        age: 30,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { mergeFields: [ 'name', 'age' ] });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name', 'age' ] });
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(setDocument('users', 'user123', { name: 'John' }))
+        .rejects.toThrow('Failed to set document');
+    });
+
+    it('should throw error on failed commit with transforms', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => 'Commit failed: permission denied',
+      });
+
+      await expect(setDocument('users', 'user123', {
+        count: FieldValue.increment(1),
+      })).rejects.toThrow('Failed to commit writes: Commit failed: permission denied');
+    });
+  });
+
+  describe('getDocument', () => {
+    it('should call correct URL', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/user123',
+          fields: {
+            name: { stringValue: 'John' },
+            age: { integerValue: '30' },
+          },
+        }),
+      });
+
+      await getDocument('users', 'user123');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/v1/projects/test-project-id/databases/(default)/documents/users/user123`,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-access-token',
+          }),
+        })
+      );
+    });
+
+    it('should convert Firestore format to JavaScript', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/user123',
+          fields: {
+            name: { stringValue: 'John' },
+            age: { integerValue: '30' },
+            active: { booleanValue: true },
+          },
+        }),
+      });
+
+      const result = await getDocument('users', 'user123');
+
+      expect(result).toEqual({
+        name: 'John',
+        age: 30,
+        active: true,
+      });
+    });
+
+    it('should return null for 404 response', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 404,
+        ok: false,
+      });
+
+      const result = await getDocument('users', 'nonexistent');
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw error on other failed requests', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 500,
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Server error' }),
+      });
+
+      await expect(getDocument('users', 'user123'))
+        .rejects.toThrow('Failed to get document');
+    });
+
+    it('should handle documents with no fields', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/user123',
+          fields: null,
+        }),
+      });
+
+      const result = await getDocument('users', 'user123');
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('updateDocument', () => {
+    it('should call correct URL with updateMask', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', { age: 31 });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('updateMask.fieldPaths=age'),
+        expect.objectContaining({
+          method: 'PATCH',
+        })
+      );
+    });
+
+    it('should include currentDocument.exists=true', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', { age: 31 });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('currentDocument.exists=true'),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle multiple fields in updateMask', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', { age: 31, city: 'NYC' });
+
+      const url = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
+      expect(url).toContain('updateMask.fieldPaths=age');
+      expect(url).toContain('updateMask.fieldPaths=city');
+    });
+
+    it('should use :commit API for pure transform updates', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', {
+        counter: FieldValue.increment(1),
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(':commit'),
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].transform).toBeDefined();
+      expect(body.writes[ 0 ].transform.fieldTransforms[ 0 ].increment).toBeDefined();
+    });
+
+    it('should use :commit API for mixed updates (fields + transforms)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', {
+        name: 'John',
+        counter: FieldValue.increment(1),
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(':commit'),
+        expect.any(Object)
+      );
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+    });
+
+    it('should handle deleteField in updateMask', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      await updateDocument('users', 'user123', {
+        name: 'John',
+        oldField: FieldValue.delete(),
+      });
+
+      const url = (global.fetch as jest.Mock).mock.calls[ 0 ][ 0 ];
+      expect(url).toContain('updateMask.fieldPaths=name');
+      expect(url).toContain('updateMask.fieldPaths=oldField');
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(updateDocument('users', 'user123', { age: 31 }))
+        .rejects.toThrow('Failed to update document');
+    });
+  });
+
+  describe('deleteDocument', () => {
+    it('should call correct URL with DELETE method', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+      });
+
+      await deleteDocument('users', 'user123');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/v1/projects/test-project-id/databases/(default)/documents/users/user123`,
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-access-token',
+          }),
+        })
+      );
+    });
+
+    it('should work with subcollections', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+      });
+
+      await deleteDocument('users/uid123/posts', 'post456');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/users/uid123/posts/post456'),
+        expect.any(Object)
+      );
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(deleteDocument('users', 'user123'))
+        .rejects.toThrow('Failed to delete document');
+    });
+  });
+
+  describe('addDocument', () => {
+    it('should call correct URL with POST method', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/auto-id-123',
+          fields: {},
+        }),
+      });
+
+      await addDocument('users', { name: 'John' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/v1/projects/test-project-id/databases/(default)/documents/users`,
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should return document reference with auto-generated ID', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/auto-id-123',
+          fields: {},
+        }),
+      });
+
+      const result = await addDocument('users', { name: 'John' });
+
+      expect(result).toEqual({
+        id: 'auto-id-123',
+        path: 'users/auto-id-123',
+      });
+    });
+
+    it('should support custom document ID', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/custom-id',
+          fields: {},
+        }),
+      });
+
+      await addDocument('users', { name: 'John' }, 'custom-id');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('?documentId=custom-id'),
+        expect.any(Object)
+      );
+    });
+
+    it('should work with subcollections', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/uid123/posts/post-id',
+          fields: {},
+        }),
+      });
+
+      const result = await addDocument('users/uid123/posts', { title: 'Test' });
+
+      expect(result.path).toBe('users/uid123/posts/post-id');
+    });
+
+    it('should handle field transforms', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test-project-id/databases/(default)/documents/users/auto-id-123',
+          fields: {},
+        }),
+      });
+
+      await addDocument('users', {
+        name: 'John',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.transforms).toBeDefined();
+      expect(body.transforms[ 0 ].fieldPath).toBe('createdAt');
+      expect(body.transforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(addDocument('users', { name: 'John' }))
+        .rejects.toThrow('Failed to add document');
+    });
+  });
+
+  describe('queryDocuments', () => {
+    it('should use simple list for queries without options', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          documents: [
+            {
+              name: 'projects/test-project-id/databases/(default)/documents/users/user1',
+              fields: { name: { stringValue: 'John' } },
+            },
+            {
+              name: 'projects/test-project-id/databases/(default)/documents/users/user2',
+              fields: { name: { stringValue: 'Jane' } },
+            },
+          ],
+        }),
+      });
+
+      const results = await queryDocuments('users');
+
+      expect(results).toHaveLength(2);
+      expect(results[ 0 ].id).toBe('user1');
+      expect(results[ 0 ].data.name).toBe('John');
+      expect(results[ 1 ].id).toBe('user2');
+      expect(results[ 1 ].data.name).toBe('Jane');
+    });
+
+    it('should use :runQuery for queries with options', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            document: {
+              name: 'projects/test-project-id/databases/(default)/documents/users/user1',
+              fields: { name: { stringValue: 'John' } },
+            },
+          },
+        ]),
+      });
+
+      await queryDocuments('users', {
+        where: [ { field: 'age', op: '>=', value: 18 } ],
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(':runQuery'),
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should use parent path for subcollection queries', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([]),
+      });
+
+      await queryDocuments('users/uid123/posts', {
+        where: [ { field: 'published', op: '==', value: true } ],
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/users/uid123:runQuery'),
+        expect.any(Object)
+      );
+    });
+
+    it('should include structured query in request body', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([]),
+      });
+
+      await queryDocuments('users', {
+        where: [ { field: 'age', op: '>=', value: 18 } ],
+        limit: 10,
+      });
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.structuredQuery).toBeDefined();
+      expect(body.structuredQuery.from[ 0 ].collectionId).toBe('users');
+      expect(body.structuredQuery.limit).toBe(10);
+    });
+
+    it('should filter out results without documents', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            document: {
+              name: 'projects/test-project-id/databases/(default)/documents/users/user1',
+              fields: { name: { stringValue: 'John' } },
+            },
+          },
+          {
+            readTime: '2024-01-01T00:00:00Z',
+          },
+        ]),
+      });
+
+      const results = await queryDocuments('users', {
+        where: [ { field: 'active', op: '==', value: true } ],
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[ 0 ].id).toBe('user1');
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(queryDocuments('users'))
+        .rejects.toThrow('Failed to query documents');
+    });
+  });
+
+  describe('batchWrite', () => {
+    it('should call :commit endpoint', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          writeResults: [
+            { updateTime: '2024-01-01T00:00:00Z' },
+          ],
+        }),
+      });
+
+      await batchWrite([
+        { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
+      ]);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(':commit'),
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should handle set operations', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].update.fields.name.stringValue).toBe('John');
+    });
+
+    it('should handle update operations', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        { type: 'update', collectionPath: 'users', documentId: 'user1', data: { age: 31 } },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].update).toBeDefined();
+      expect(body.writes[ 0 ].updateMask).toBeDefined();
+      expect(body.writes[ 0 ].currentDocument.exists).toBe(true);
+    });
+
+    it('should handle delete operations', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        { type: 'delete', collectionPath: 'users', documentId: 'user1' },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].delete).toBeDefined();
+      expect(body.writes[ 0 ].delete).toContain('/users/user1');
+    });
+
+    it('should handle multiple operations', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          writeResults: [
+            { updateTime: '2024-01-01T00:00:00Z' },
+            { updateTime: '2024-01-01T00:00:01Z' },
+            { updateTime: '2024-01-01T00:00:02Z' },
+          ],
+        }),
+      });
+
+      await batchWrite([
+        { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
+        { type: 'update', collectionPath: 'users', documentId: 'user2', data: { age: 31 } },
+        { type: 'delete', collectionPath: 'users', documentId: 'user3' },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes).toHaveLength(3);
+    });
+
+    it('should handle transforms in batch operations', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: {
+            name: 'John',
+            createdAt: FieldValue.serverTimestamp(),
+          },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].setToServerValue).toBe('REQUEST_TIME');
+    });
+
+    it('should handle set with merge option in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: { name: 'John' },
+          options: { merge: true },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
+    });
+
+    it('should handle set with mergeFields option in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'set',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: { name: 'John', age: 30 },
+          options: { mergeFields: [ 'name' ] },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateMask).toEqual({ fieldPaths: [ 'name' ] });
+    });
+
+    it('should handle update with transforms in batch', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ writeResults: [ { updateTime: '2024-01-01T00:00:00Z' } ] }),
+      });
+
+      await batchWrite([
+        {
+          type: 'update',
+          collectionPath: 'users',
+          documentId: 'user1',
+          data: {
+            name: 'John',
+            count: FieldValue.increment(1),
+          },
+        },
+      ]);
+
+      const callArgs = (global.fetch as jest.Mock).mock.calls[ 0 ];
+      const body = JSON.parse(callArgs[ 1 ].body);
+
+      expect(body.writes[ 0 ].updateTransforms).toBeDefined();
+      expect(body.writes[ 0 ].updateTransforms[ 0 ].increment.integerValue).toBe('1');
+    });
+
+    it('should throw error for unknown operation type', async () => {
+      await expect(batchWrite([
+        { type: 'unknown' as any, collectionPath: 'users', documentId: 'user1' },
+      ])).rejects.toThrow('Unknown batch operation type: unknown');
+    });
+
+    it('should throw error on failed request', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Test error' }),
+      });
+
+      await expect(batchWrite([
+        { type: 'set', collectionPath: 'users', documentId: 'user1', data: { name: 'John' } },
+      ])).rejects.toThrow('Failed to perform batch write');
+    });
+  });
+
+  describe('getAll', () => {
+    const basePath = `projects/${TEST_PROJECT}/databases/(default)/documents`;
+
+    it('should return empty array for empty input', async () => {
+      const result = await getAll('users', []);
+      expect(result).toEqual([]);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should fetch a single document', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', [ 'user1' ]);
+
+      expect(result).toEqual([ { name: 'Alice' } ]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/v1/${basePath}:batchGet`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Authorization': `Bearer ${TEST_TOKEN}`,
+          }),
+          body: JSON.stringify({
+            documents: [ `${basePath}/users/user1` ],
+          }),
+        })
+      );
+    });
+
+    it('should fetch multiple documents all found', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user2`,
+              fields: { name: { stringValue: 'Bob' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', [ 'user1', 'user2' ]);
+
+      expect(result).toEqual([ { name: 'Alice' }, { name: 'Bob' } ]);
+    });
+
+    it('should return null for missing documents', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            missing: `${basePath}/users/user2`,
+          },
+          {
+            found: {
+              name: `${basePath}/users/user3`,
+              fields: { name: { stringValue: 'Charlie' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', [ 'user1', 'user2', 'user3' ]);
+
+      expect(result).toEqual([ { name: 'Alice' }, null, { name: 'Charlie' } ]);
+    });
+
+    it('should reorder results to match input order', async () => {
+      // API returns results out of order
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/user3`,
+              fields: { name: { stringValue: 'Charlie' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user1`,
+              fields: { name: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/users/user2`,
+              fields: { name: { stringValue: 'Bob' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users', [ 'user1', 'user2', 'user3' ]);
+
+      // Should match input order, not API response order
+      expect(result).toEqual([
+        { name: 'Alice' },
+        { name: 'Bob' },
+        { name: 'Charlie' },
+      ]);
+    });
+
+    it('should work with subcollection paths', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/uid1/posts/post1`,
+              fields: { title: { stringValue: 'Hello' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAll('users/uid1/posts', [ 'post1' ]);
+
+      expect(result).toEqual([ { title: 'Hello' } ]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          body: JSON.stringify({
+            documents: [ `${basePath}/users/uid1/posts/post1` ],
+          }),
+        })
+      );
+    });
+
+    it('should throw on API error', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Permission denied' }),
+      });
+
+      await expect(getAll('users', [ 'user1' ])).rejects.toThrow('Failed to batch get documents');
+    });
+
+    it('should throw when more than 100 documents requested', async () => {
+      const ids = Array.from({ length: 101 }, (_, i) => `user${i}`);
+      await expect(getAll('users', ids)).rejects.toThrow('getAll supports a maximum of 100 documents per request');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllByPaths', () => {
+    const basePath = `projects/${TEST_PROJECT}/databases/(default)/documents`;
+
+    it('should return empty array for empty input', async () => {
+      const result = await getAllByPaths([]);
+      expect(result).toEqual([]);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should fetch a single document', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/uid1/profile/default`,
+              fields: { displayName: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAllByPaths([
+        { collection: 'users/uid1/profile', id: 'default' },
+      ]);
+
+      expect(result).toEqual([ { displayName: 'Alice' } ]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `http://${EMU_HOST}/v1/${basePath}:batchGet`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            documents: [ `${basePath}/users/uid1/profile/default` ],
+          }),
+        })
+      );
+    });
+
+    it('should fetch multiple documents from different collections', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/uid1/profile/default`,
+              fields: { displayName: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            found: {
+              name: `${basePath}/teams/team1`,
+              fields: { name: { stringValue: 'Engineering' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+        ]),
+      });
+
+      const result = await getAllByPaths([
+        { collection: 'users/uid1/profile', id: 'default' },
+        { collection: 'teams', id: 'team1' },
+      ]);
+
+      expect(result).toEqual([
+        { displayName: 'Alice' },
+        { name: 'Engineering' },
+      ]);
+    });
+
+    it('should return null for missing documents', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            found: {
+              name: `${basePath}/users/uid1/profile/default`,
+              fields: { displayName: { stringValue: 'Alice' } },
+              createTime: '2026-01-01T00:00:00Z',
+              updateTime: '2026-01-01T00:00:00Z',
+            },
+          },
+          {
+            missing: `${basePath}/users/uid2/profile/default`,
+          },
+        ]),
+      });
+
+      const result = await getAllByPaths([
+        { collection: 'users/uid1/profile', id: 'default' },
+        { collection: 'users/uid2/profile', id: 'default' },
+      ]);
+
+      expect(result).toEqual([ { displayName: 'Alice' }, null ]);
     });
 
     it('should reorder results to match input order', async () => {
