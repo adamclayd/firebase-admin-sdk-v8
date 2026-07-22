@@ -47,7 +47,14 @@ export default {
     // Initialize with env variables
     initializeApp({
       serviceAccount: env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY,
-      projectId: env.FIREBASE_PROJECT_ID
+      projectId: env.FIREBASE_PROJECT_ID,
+
+      apiKey: env.FIREBASE_API_KEY,
+
+      // optional - use for local development
+      authEmulatorHost: env.FIREBASE_AUTH_EMULATOR_HOST,
+      firestoreEmulatorHost: env.FIREBASE_FIRESTORE_EMULATOR_HOST,
+      storageEmulatorHost: env.FIREBASE_STORAGE_EMULATOR_HOST,
     });
 
     // Now use the SDK
@@ -69,7 +76,9 @@ initializeApp({
   serviceAccount: JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY!),
   projectId: process.env.FIREBASE_PROJECT_ID,
 
-  // use for local development
+  apiKey: process.env.FIREBASE_API_KEY,
+
+  // optional - use for local development
   authEmulatorHost: process.env.FIREBASE_AUTH_EMULATOR_HOST,
   firestoreEmulatorHost: process.env.FIREBASE_FIRESTORE_EMULATOR_HOST,
   storageEmulatorHost: process.env.FIREBASE_STORAGE_EMULATOR_HOST,
@@ -83,6 +92,7 @@ initializeApp({
 ```env
 FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
 FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_API_KEY=your-api-key
 
 # use for local development
 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
@@ -90,9 +100,29 @@ FIREBASE_FIRESTORE_EMULATOR_HOST=localhost:8080
 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
 
-**Note:**
-If a particular emulator setting is provided it will override the production setting. So make sure you have all of the emulator environment variables and `initializeApp()` settings are unset before deploying to production. 
+* **Notes:**
+  * If a particular emulator setting is provided it will override the production setting. So make sure you have all of the emulator environment variables and `initializeApp()` settings cleared when deploying to production. 
+  * On worker environments like Cloudflare it does not default to any environment variables so you have to call `initializeApp()` with the appropriate settings for your environment.
 
+
+### Initializing And Starting The Emulators
+If you are going to be using the Firebase emulators for local development you need to run these commands:
+
+Install Firebase Cli:
+```bash
+npm install -g firebase-tools
+```
+
+Initialize:
+```bash
+firebase init emulators
+# > select Firestore, Authentication, an/or Storage when asked
+```
+
+Start:
+```bash
+firebase emulators:start
+```
 
 ### 2. Verify ID Tokens
 

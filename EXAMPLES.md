@@ -547,7 +547,7 @@ firebase emulators:start
 
 Initialize your app with emulators:
 ```typescript
-import { initializeApp } from '@prmichaelsen/firebase-admin-sdk-v8';
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
 
 const authPort = 9099;
 const firestorePort = 8080;
