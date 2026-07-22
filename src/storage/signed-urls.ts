@@ -3,7 +3,7 @@
  * Uses Google Cloud Storage V4 signing process
  */
 
-import { getServiceAccount, getProjectId } from '../config';
+import { getServiceAccount, getProjectId, getStorageEmulatorHost } from '../config';
 
 /**
  * Get the storage bucket name (same logic as client.ts)
@@ -190,6 +190,11 @@ export async function generateSignedUrl(
     'X-Goog-SignedHeaders': signedHeaders,
   };
   
+  // For read operations, force raw media response for the emulator
+  if (options.action === 'read') {
+    queryParams['alt'] = 'media';
+  }
+  
   // Add optional query parameters
   if (options.contentType) {
     queryParams['response-content-type'] = options.contentType;
@@ -236,11 +241,15 @@ export async function generateSignedUrl(
     canonicalRequestHash,
   ].join('\n');
   
+  const emuHost = getStorageEmulatorHost();
+
   // Sign the string
-  const signature = await signData(stringToSign, serviceAccount.private_key);
+  const signature = emuHost ? `firebase-admin-sdk-v8-${getProjectId()}` : await signData(stringToSign, serviceAccount.private_key);
   
   // Build final URL
-  const signedUrl = `https://storage.googleapis.com${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signature}`;
+  const signedUrl = emuHost
+    ? `http://${emuHost}/v0/b/${bucket}/o/${encodedPath}?${canonicalQueryString}&X-Goog-Signature=${signature}`
+    : `https://storage.googleapis.com${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signature}`;
   
   return signedUrl;
 }

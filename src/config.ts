@@ -12,6 +12,9 @@ interface SDKConfig {
   serviceAccount?: ServiceAccount | string;
   projectId?: string;
   apiKey?: string;
+  authEmulatorHost?: string;
+  firestoreEmulatorHost?: string;
+  storageEmulatorHost?: string;
 }
 
 /**
@@ -170,4 +173,17 @@ export function getFirebaseApiKey(): string {
     'Either call initializeApp({ apiKey: ... }) or set FIREBASE_API_KEY environment variable. ' +
     'Find your API key in Firebase Console > Project Settings > Web API Key.'
   );
+}
+
+export function getAuthEmulatorHost() {
+  return globalConfig.authEmulatorHost ? globalConfig.authEmulatorHost : process?.env.FIREBASE_AUTH_EMULATOR_HOST;
+}
+
+
+export function getFirestoreEmulatorHost() {
+  return globalConfig.firestoreEmulatorHost ? globalConfig.firestoreEmulatorHost : process?.env.FIREBASE_FIRESTORE_EMULATOR_HOST;
+}
+
+export function getStorageEmulatorHost() {
+  return globalConfig.storageEmulatorHost ? globalConfig.storageEmulatorHost : process?.env.FIREBASE_STORAGE_EMULATOR_HOST;
 }

@@ -425,3 +425,21 @@ MzEfYyjiWA4R4/M2bS1+fWIcPm15j9QMQKL0hP4KZm6/Zyqrq3FGj6O6/zFvpvlI
     });
   });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+describe('Emulated Token Generation', () => {
+  it('should generate a the string "owner" if the emulated parameter is true', async () => {
+    const token = await getAdminAccessToken(true);
+    expect(token).toBe('owner');
+  });
+});

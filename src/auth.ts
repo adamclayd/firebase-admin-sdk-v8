@@ -5,7 +5,7 @@
 
 import type { DecodedIdToken, UserInfo } from './types';
 import { getProjectId } from './service-account';
-import { getServiceAccount, getFirebaseApiKey } from './config';
+import { getServiceAccount, getFirebaseApiKey, getAuthEmulatorHost } from './config';
 import { importPublicKeyFromX509 } from './x509';
 
 /**
@@ -178,29 +178,34 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
 
     // Get project ID
     const projectId = getProjectId();
+    const emuHost = getAuthEmulatorHost();
+    
 
     // Validate header
-    if (header.alg !== 'RS256') {
-      throw new Error('Invalid algorithm. Expected RS256');
+    if ((header.alg !== 'RS256' && !emuHost) || (emuHost && header.alg !== 'none')) {
+      throw new Error(`Invalid algorithm. Expected ${emuHost ? 'none' : 'RS256'}`);
     }
 
     // Validate basic claims
     const now = Math.floor(Date.now() / 1000);
-    
+
     if (!payload.exp || payload.exp < now) {
       throw new Error('Token has expired');
     }
 
-    if (!payload.iat || payload.iat > now) {
+    // Allow 5-minute (300s) clock skew tolerance to account for minor clock drift
+    // between local system time and Google Auth server timestamps.
+    const clockSkew = 300;
+    if ((!payload.iat || payload.iat > now + clockSkew) && !emuHost) {
       throw new Error('Token issued in the future');
     }
 
-    if (!payload.auth_time || payload.auth_time > now) {
+    if ((!payload.auth_time || payload.auth_time > now + clockSkew) && !emuHost) {
       throw new Error('Auth time is in the future');
     }
 
     // Validate audience (must be project ID)
-    if (payload.aud !== projectId) {
+    if (payload.aud !== projectId && !emuHost) {
       throw new Error(`Invalid audience. Expected ${projectId}, got ${payload.aud}`);
     }
 
@@ -209,11 +214,20 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
       `https://securetoken.google.com/${projectId}`,  // Firebase v9 and earlier
       `https://session.firebase.google.com/${projectId}`, // Firebase v10+
     ];
+    const emuIssuer = `firebase-auth-emulator@${projectId}`;
 
-    if (!validIssuers.includes(payload.iss)) {
+    if (!emuHost && !validIssuers.includes(payload.iss)) {
       throw new Error(
         `Invalid issuer. Expected one of: ${validIssuers.join(', ')}, got ${payload.iss}`
       );
+    } else if (emuHost) {
+      const isEmuValid = payload.iss === emuIssuer ||
+                         payload.iss.includes('securetoken.google.com') ||
+                         payload.iss.includes('session.firebase.google.com') ||
+                         payload.iss.includes('firebase-auth-emulator');
+      if (!isEmuValid) {
+        throw new Error(`Invalid issuer. Expected: ${emuIssuer}, got ${payload.iss}`);
+      }
     }
 
     // Validate subject
@@ -225,41 +239,43 @@ export async function verifyIdToken(idToken: string): Promise<DecodedIdToken> {
       throw new Error('Subject too long');
     }
 
-    // Fetch public keys and verify signature (pass issuer to get correct endpoint)
-    let publicKeys = await fetchPublicKeys(payload.iss);
-    let publicKeyPem = publicKeys[header.kid];
+    if(!emuHost) {
+      // Fetch public keys and verify signature (pass issuer to get correct endpoint)
+      let publicKeys = await fetchPublicKeys(payload.iss);
+      let publicKeyPem = publicKeys[header.kid];
 
-    // If key not found, it might have rotated - clear cache and retry once
-    if (!publicKeyPem) {
-      // Clear the appropriate cache based on issuer
-      const isSessionCookie = payload.iss && payload.iss.includes('session.firebase.google.com');
-      if (isSessionCookie) {
-        sessionKeysCache = null;
-        sessionKeysCacheExpiry = 0;
-      } else {
-        idTokenKeysCache = null;
-        idTokenKeysCacheExpiry = 0;
-      }
-      
-      publicKeys = await fetchPublicKeys(payload.iss);
-      publicKeyPem = publicKeys[header.kid];
-      
+      // If key not found, it might have rotated - clear cache and retry once
       if (!publicKeyPem) {
-        // Still not found after refresh
-        const availableKids = Object.keys(publicKeys).join(', ');
-        throw new Error(
-          `Public key not found for kid: ${header.kid}. ` +
-          `Available kids: ${availableKids}. ` +
-          `This might indicate the token is from a different Firebase project or was signed with a very old key.`
-        );
+        // Clear the appropriate cache based on issuer
+        const isSessionCookie = payload.iss && payload.iss.includes('session.firebase.google.com');
+        if (isSessionCookie) {
+          sessionKeysCache = null;
+          sessionKeysCacheExpiry = 0;
+        } else {
+          idTokenKeysCache = null;
+          idTokenKeysCacheExpiry = 0;
+        }
+        
+        publicKeys = await fetchPublicKeys(payload.iss);
+        publicKeyPem = publicKeys[header.kid];
+        
+        if (!publicKeyPem) {
+          // Still not found after refresh
+          const availableKids = Object.keys(publicKeys).join(', ');
+          throw new Error(
+            `Public key not found for kid: ${header.kid}. ` +
+            `Available kids: ${availableKids}. ` +
+            `This might indicate the token is from a different Firebase project or was signed with a very old key.`
+          );
+        }
       }
-    }
 
-    const publicKey = await importPublicKeyFromX509(publicKeyPem);
-    const isValid = await verifySignature(idToken, publicKey);
+      const publicKey = await importPublicKeyFromX509(publicKeyPem);
+      const isValid = await verifySignature(idToken, publicKey);
 
-    if (!isValid) {
-      throw new Error('Invalid token signature');
+      if (!isValid) {
+        throw new Error('Invalid token signature');
+      }
     }
 
     // Return decoded token with uid
@@ -384,10 +400,13 @@ export async function createCustomToken(
   }
   
   // Build JWT payload
+  
   const now = Math.floor(Date.now() / 1000);
+  const emuHost = getAuthEmulatorHost();
+  
   const payload: Record<string, any> = {
-    iss: serviceAccount.client_email,
-    sub: serviceAccount.client_email,
+    iss: emuHost ? `firebase-auth-emulator@${getProjectId()}` : serviceAccount.client_email,
+    sub: emuHost ? `firebase-auth-emulator@${getProjectId()}` : serviceAccount.client_email,
     aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
     iat: now,
     exp: now + 3600, // 1 hour
@@ -401,7 +420,7 @@ export async function createCustomToken(
   
   // Create JWT header
   const header = {
-    alg: 'RS256',
+    alg: emuHost ? 'none' :'RS256',
     typ: 'JWT',
   };
   
@@ -409,9 +428,10 @@ export async function createCustomToken(
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-  
+
+
   // Sign with private key
-  const signature = await signWithPrivateKey(unsignedToken, serviceAccount.private_key);
+  const signature =  emuHost ? 'firebase-admin-sdk-v8-mock-signature' : await signWithPrivateKey(unsignedToken, serviceAccount.private_key);
   
   return `${unsignedToken}.${signature}`;
 }
@@ -443,9 +463,11 @@ export async function signInWithCustomToken(
   
   // Get Firebase Web API key
   const apiKey = getFirebaseApiKey();
+
+  const emuHost = getAuthEmulatorHost();
   
-  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`;
-  
+  const url = emuHost ? `http://${emuHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}` : `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`;
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -544,12 +566,13 @@ export async function createSessionCookie(
   }
   
   // Get access token for API call
+  const emuHost = getAuthEmulatorHost();
   const { getAdminAccessToken } = await import('./token-generation');
-  const accessToken = await getAdminAccessToken();
   const projectId = getProjectId();
+  const accessToken = await getAdminAccessToken(!!emuHost);
   
   // Call Identity Toolkit API to create session cookie
-  const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}:createSessionCookie`;
+  const url = emuHost ? `http://${emuHost}/identitytoolkit.googleapis.com/v1/projects/${projectId}:createSessionCookie`: `https://identitytoolkit.googleapis.com/v1/projects/${projectId}:createSessionCookie`;
   
   const validDurationSeconds = Math.floor(options.expiresIn / 1000);
   
@@ -621,6 +644,8 @@ export async function verifySessionCookie(
       throw new Error('Invalid session cookie format');
     }
     
+    const emuHost = getAuthEmulatorHost();
+
     const [headerB64, payloadB64] = parts;
     
     // Decode header
@@ -634,26 +659,36 @@ export async function verifySessionCookie(
     // Validate claims
     const projectId = getProjectId();
     const now = Math.floor(Date.now() / 1000);
-    
+
     // Check expiration
-    if (!payload.exp || payload.exp < now) {
+    if ((!payload.exp || payload.exp < now)) {
       throw new Error('Session cookie has expired');
     }
+
     
-    // Check issued at
-    if (!payload.iat || payload.iat > now) {
+    // Check issued at with 5-minute (300s) clock skew tolerance for clock drift
+    const clockSkew = 300;
+    if ((!payload.iat || payload.iat > now + clockSkew) && !emuHost) {
       throw new Error('Session cookie issued in the future');
     }
     
     // Check audience (should be project ID)
-    if (payload.aud !== projectId) {
+    if ((!emuHost && payload.aud !== projectId) && !emuHost) {
       throw new Error(`Session cookie has incorrect audience. Expected ${projectId}, got ${payload.aud}`);
     }
     
     // Check issuer (session cookies have different issuer than ID tokens)
-    const expectedIssuer = `https://session.firebase.google.com/${projectId}`;
-    if (payload.iss !== expectedIssuer) {
+    const expectedIssuer = emuHost ? `firebase-auth-emulator@${projectId}` : `https://session.firebase.google.com/${projectId}`;
+    if (!emuHost && payload.iss !== expectedIssuer) {
       throw new Error(`Session cookie has incorrect issuer. Expected ${expectedIssuer}, got ${payload.iss}`);
+    } else if (emuHost) {
+      const isEmuValid = payload.iss === expectedIssuer ||
+                         payload.iss.includes('session.firebase.google.com') ||
+                         payload.iss.includes('securetoken.google.com') ||
+                         payload.iss.includes('firebase-auth-emulator');
+      if (!isEmuValid) {
+        throw new Error(`Session cookie has incorrect issuer. Expected ${expectedIssuer}, got ${payload.iss}`);
+      }
     }
     
     // Check subject (user ID)
@@ -661,17 +696,19 @@ export async function verifySessionCookie(
       throw new Error('Session cookie has no subject (user ID)');
     }
     
-    // Verify signature using public keys
-    await verifySessionCookieSignature(sessionCookie, header, payload);
-    
-    // TODO: Check if revoked (if requested)
-    // This would require calling the Identity Toolkit API
-    // to check the user's tokensValidAfterTime
-    if (checkRevoked) {
-      // For now, we skip this check
-      // Future implementation would call:
-      // await checkIfTokenRevoked(payload.sub);
-    }
+    if(!emuHost) {
+      // Verify signature using public keys
+      await verifySessionCookieSignature(sessionCookie, header, payload);
+      
+      // TODO: Check if revoked (if requested)
+      // This would require calling the Identity Toolkit API
+      // to check the user's tokensValidAfterTime
+      if (checkRevoked) {
+        // For now, we skip this check
+        // Future implementation would call:
+        // await checkIfTokenRevoked(payload.sub);
+      }
+    } 
     
     // Return decoded token
     return {

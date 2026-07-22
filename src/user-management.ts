@@ -12,8 +12,18 @@ import type {
   ListUsersResult,
   ActionCodeSettings,
 } from './types';
+import { getAuthEmulatorHost } from './config';
 
 const IDENTITY_TOOLKIT_API = 'https://identitytoolkit.googleapis.com/v1';
+const IDENTITY_TOOLKIT_EMULATOR_PATH = 'identitytoolkit.googleapis.com/v1';
+
+function getUrl(path: string) {
+  path.endsWith('/') && (path = path.slice(0, -1));
+  const emuHost = getAuthEmulatorHost();
+  return emuHost
+    ? `http://${emuHost}/${IDENTITY_TOOLKIT_EMULATOR_PATH}${path}`
+    : `${IDENTITY_TOOLKIT_API}${path}`;
+}
 
 /**
  * Convert Firebase Identity Toolkit user response to UserRecord
@@ -47,10 +57,11 @@ export async function getUserByEmail(email: string): Promise<UserRecord | null> 
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:lookup`,
+    getUrl(`/projects/${projectId}/accounts:lookup`),
     {
       method: 'POST',
       headers: {
@@ -86,10 +97,12 @@ export async function getUserByUid(uid: string): Promise<UserRecord | null> {
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
+  
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:lookup`,
+    getUrl(`/projects/${projectId}/accounts:lookup`),
     {
       method: 'POST',
       headers: {
@@ -125,7 +138,8 @@ export async function createUser(properties: CreateUserRequest): Promise<UserRec
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   // Build request body
   const requestBody: any = {};
@@ -139,7 +153,7 @@ export async function createUser(properties: CreateUserRequest): Promise<UserRec
   if (typeof properties.disabled === 'boolean') requestBody.disabled = properties.disabled;
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts`,
+    getUrl(`/projects/${projectId}/accounts`),
     {
       method: 'POST',
       headers: {
@@ -177,7 +191,8 @@ export async function updateUser(uid: string, properties: UpdateUserRequest): Pr
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   // Build request body
   const requestBody: any = { localId: uid };
@@ -191,7 +206,7 @@ export async function updateUser(uid: string, properties: UpdateUserRequest): Pr
   if (typeof properties.disabled === 'boolean') requestBody.disableUser = properties.disabled;
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:update`,
+    getUrl(`/projects/${projectId}/accounts:update`),
     {
       method: 'POST',
       headers: {
@@ -221,10 +236,11 @@ export async function deleteUser(uid: string): Promise<void> {
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:delete`,
+    getUrl(`/projects/${projectId}/accounts:delete`),
     {
       method: 'POST',
       headers: {
@@ -256,7 +272,8 @@ export async function listUsers(
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   // Build query string parameters
   const params = new URLSearchParams({
@@ -268,7 +285,7 @@ export async function listUsers(
   }
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:query?${params.toString()}`,
+    getUrl(`/projects/${projectId}/accounts:query?${params.toString()}`),
     {
       method: 'GET',
       headers: {
@@ -312,7 +329,8 @@ export async function setCustomUserClaims(
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   const requestBody: any = {
     localId: uid,
@@ -320,7 +338,7 @@ export async function setCustomUserClaims(
   };
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:update`,
+    getUrl(`/projects/${projectId}/accounts:update`),
     {
       method: 'POST',
       headers: {
@@ -402,7 +420,8 @@ export async function generatePasswordResetLink(
   }
 
   const projectId = getProjectId();
-  const accessToken = await getAdminAccessToken();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
 
   const requestBody: Record<string, any> = {
     requestType: 'PASSWORD_RESET',
@@ -415,7 +434,7 @@ export async function generatePasswordResetLink(
   }
 
   const response = await fetch(
-    `${IDENTITY_TOOLKIT_API}/projects/${projectId}/accounts:sendOobCode`,
+    getUrl(`/projects/${projectId}/accounts:sendOobCode`),
     {
       method: 'POST',
       headers: {
@@ -435,6 +454,54 @@ export async function generatePasswordResetLink(
 
   if (!data.oobLink) {
     throw new Error('Password reset link not returned by server');
+  }
+
+  return data.oobLink;
+}
+
+export async function generateEmailVerificationLink(
+  email: string,
+  actionCodeSettings?: ActionCodeSettings
+): Promise<string> {
+  if (!email || typeof email !== 'string') {
+    throw new Error('email must be a non-empty string');
+  }
+
+  const projectId = getProjectId();
+  const emuHost = getAuthEmulatorHost();
+  const accessToken = await getAdminAccessToken(!!emuHost);
+
+  const requestBody: Record<string, any> = {
+    requestType: 'VERIFY_EMAIL',
+    email,
+    returnOobLink: true,
+  };
+
+  if (actionCodeSettings) {
+    Object.assign(requestBody, buildActionCodeSettingsRequest(actionCodeSettings));
+  }
+
+  const response = await fetch(
+    getUrl(`/projects/${projectId}/accounts:sendOobCode`),
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to generate email verification link: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.oobLink) {
+    throw new Error('Email verification link not returned by server');
   }
 
   return data.oobLink;
