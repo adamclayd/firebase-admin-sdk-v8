@@ -28,6 +28,7 @@ export {
   listUsers,
   setCustomUserClaims,
   generatePasswordResetLink,
+  generateEmailVerificationLink
 } from './user-management';
 
 // Firestore exports
