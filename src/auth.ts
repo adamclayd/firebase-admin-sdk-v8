@@ -403,8 +403,8 @@ export async function createCustomToken(
   const emuHost = getAuthEmulatorHost();
   
   const payload: Record<string, any> = {
-    iss: emuHost ? `firebase-auth-emulator@${getProjectId()}` : serviceAccount.client_email,
-    sub: emuHost ? `firebase-auth-emulator@${getProjectId()}` : serviceAccount.client_email,
+    iss: emuHost ? `firebase-auth-emulator@${getProjectId()}` : getServiceAccount().client_email,
+    sub: emuHost ? `firebase-auth-emulator@${getProjectId()}` : getServiceAccount().client_email,
     aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
     iat: now,
     exp: now + 3600, // 1 hour
