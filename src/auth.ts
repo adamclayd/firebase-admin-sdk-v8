@@ -388,8 +388,6 @@ export async function createCustomToken(
   uid: string,
   customClaims?: CustomClaims
 ): Promise<string> {
-  const serviceAccount = getServiceAccount();
-  
   // Validate UID
   if (!uid || typeof uid !== 'string') {
     throw new Error('uid must be a non-empty string');
@@ -431,7 +429,7 @@ export async function createCustomToken(
 
 
   // Sign with private key
-  const signature =  emuHost ? 'firebase-admin-sdk-v8-mock-signature' : await signWithPrivateKey(unsignedToken, serviceAccount.private_key);
+  const signature =  emuHost ? 'firebase-admin-sdk-v8-mock-signature' : await signWithPrivateKey(unsignedToken, getServiceAccount().private_key);
   
   return `${unsignedToken}.${signature}`;
 }
