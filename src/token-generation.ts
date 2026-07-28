@@ -3,7 +3,7 @@
  * Uses Web Crypto API for compatibility with Cloudflare Workers
  */
 
-import type { CacheAdminAccessTokenStore, ServiceAccount, TokenResponse } from './types';
+import type { ServiceAccount, TokenResponse } from './types';
 import { getServiceAccount } from './service-account';
 import { getCachedAdminAccessTokenStore } from './config';
 /**
