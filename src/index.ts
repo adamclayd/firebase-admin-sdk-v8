@@ -4,7 +4,7 @@
  */
 
 // Configuration exports
-export { initializeApp, getConfig, clearConfig } from './config';
+export { initializeApp, getConfig, clearConfig, getCachedAdminAccessTokenStore as getAdminTokenStore } from './config';
 
 // Auth exports
 export {
