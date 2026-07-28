@@ -65,9 +65,6 @@ export { sendMessage, subscribeToTopic, unsubscribeFromTopic } from './messaging
 // Field value helpers
 export { FieldValue } from './field-value';
 
-// Token generation exports
-export { getAdminAccessToken, clearTokenCache } from './token-generation';
-
 // Service account exports (deprecated, use initializeApp instead)
 export { getServiceAccount, getProjectId } from './service-account';
 
@@ -96,6 +93,7 @@ export type {
   UpdateUserRequest,
   ListUsersResult,
   ActionCodeSettings,
+  CacheAdminAccessTokenStore
 } from './types';
 
 // Messaging type exports

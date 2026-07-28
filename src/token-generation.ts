@@ -3,8 +3,9 @@
  * Uses Web Crypto API for compatibility with Cloudflare Workers
  */
 
-import type { ServiceAccount, TokenResponse } from './types';
+import type { CacheAdminAccessTokenStore, ServiceAccount, TokenResponse } from './types';
 import { getServiceAccount } from './service-account';
+import { getCachedAdminAccessTokenStore } from './config';
 /**
  * Base64URL encode a string
  */
@@ -87,11 +88,7 @@ async function createJWT(serviceAccount: ServiceAccount): Promise<string> {
   return `${unsignedToken}.${encodedSignature}`;
 }
 
-/**
- * Token cache to avoid unnecessary regeneration
- */
-let cachedAccessToken: string | null = null;
-let tokenExpiry: number = 0;
+
 
 /**
  * Get OAuth access token for Firebase Admin API
@@ -105,7 +102,10 @@ export async function getAdminAccessToken(emulated = false): Promise<string> {
     return 'owner';
   }
 
-  if (cachedAccessToken && Date.now() < tokenExpiry) {
+  const tokenStore = getCachedAdminAccessTokenStore();
+
+  const cachedAccessToken = await tokenStore.get();
+  if (cachedAccessToken) {
     return cachedAccessToken;
   }
 
@@ -128,18 +128,8 @@ export async function getAdminAccessToken(emulated = false): Promise<string> {
   }
 
   const data = await response.json() as TokenResponse;
-  cachedAccessToken = data.access_token;
+  await tokenStore.set(data);
   
-  // Set expiry with 1 minute buffer to ensure token is refreshed before it expires
-  tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
 
-  return cachedAccessToken;
-}
-
-/**
- * Clear the cached access token (useful for testing or forcing refresh)
- */
-export function clearTokenCache(): void {
-  cachedAccessToken = null;
-  tokenExpiry = 0;
+  return (await tokenStore.get())!;
 }

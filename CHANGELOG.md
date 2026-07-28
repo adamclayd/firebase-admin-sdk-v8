@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-07-28
+### Added
+- **Custom Token Store**: Added `CacheAdminAccessTokenStore` interface for custom admin access token caching
+  - `CacheAdminAccessTokenStore` interface with `get()`, `set()`, `clear()` methods
+  - Default in-memory token store with 1-hour expiration
+  - Custom implementations can be provided via `initializeApp()` config
+  - Example implementation for Cloudflare Workers using Redis (Upstash)
+
+### Changed
+- Updated `initializeApp()` config to accept `cachedAdminAccessTokenStore` option
+- Updated `initializeApp()` documentation to include custom token store usage examples
+- Token store now stores `TokenResponse` (with `access_token` and `expires_in`) instead of just token string
+- Default admin access token caching set a variable in memory to cache and will expire in `expires_in` - 60 seconds.
+- Default admin access token caching will not persist between worker requests in a worker environment. So If the developer would like cahcing the admin access token between worker requests they should provide a custom token store implementation to the `cachedAdminAccessTokenStore` option in `initializeApp()` config.
+
 ## [2.10.0] - 2026-07-22
 ### Added
 - **Emulator Support**: Added support for Firestore, Auth, and Storage emulators

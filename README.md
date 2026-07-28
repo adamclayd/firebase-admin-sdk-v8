@@ -81,7 +81,7 @@ initializeApp({
   // optional - use for local development
   authEmulatorHost: process.env.FIREBASE_AUTH_EMULATOR_HOST,
   firestoreEmulatorHost: process.env.FIREBASE_FIRESTORE_EMULATOR_HOST,
-  storageEmulatorHost: process.env.FIREBASE_STORAGE_EMULATOR_HOST,
+  storageEmulatorHost: process.env.FIREBASE_STORAGE_EMULATOR_HOST
 });
 
 // Option 2: Auto-detect from process.env (no initialization needed)
@@ -103,6 +103,49 @@ FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 * **Notes:**
   * If a particular emulator setting is provided it will override the production setting. So make sure you have all of the emulator environment variables and `initializeApp()` settings cleared when deploying to production. 
   * On worker environments like Cloudflare it does not default to any environment variables so you have to call `initializeApp()` with the appropriate settings for your environment.
+
+
+**Adding Custom Token Store:**
+If you need to use a different cache for the admin access token, you can provide your own implementation of `CacheAdminAccessTokenStore` to the `initializeApp()` function. The default assigns it to one variable in memory and will expire in exp - 60 seconds. The default will not work in a worker environment like Cloudflare because the variable will not persist between requests. See the example below:
+
+```typescript
+import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
+import { CacheAdminAccessTokenStore, TokenResponse } from '@intuitive-perception/firebase-admin-sdk-v8';
+import { Redis } from "@upstash/redis/cloudflare";
+
+class RedisTokenStore implements CacheAdminAccessTokenStore {
+  constructor(private redis: Redis) {}
+
+  async get(): Promise<string | null> {
+    return await this.redis.getex('firebase:admin-access-token');
+  }
+
+  async set(data: TokenResponse): Promise<void> {
+    return await this.redis.set('firebase:admin-access-token', data.access_token, { ex: data.expires_in - 60 });
+  }
+
+  async clear() {
+    await this.redis.del('firebase:admin-access-token');
+  }
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    initializeApp({
+      serviceAccount: env.FIREBASE_ADMIN_SERVICE_ACCOUNT_KEY,
+      projectId: env.FIREBASE_PROJECT_ID,
+      apiKey: env.FIREBASE_API_KEY,
+
+      // provide your custom token store
+      cachedAdminAccessTokenStore: new RedisTokenStore(Redis.fromEnv(env)),
+    });
+
+    // use firebase-admin-sdk-v8
+  }
+}
+```
+
+Your app will now use the Cloudflare Redis instance for admin access token caching.
 
 
 ### Initializing And Starting The Emulators
