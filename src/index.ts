@@ -6,6 +6,8 @@
 // Configuration exports
 export { initializeApp, getConfig, clearConfig, getCachedAdminAccessTokenStore as getAdminTokenStore } from './config';
 
+export { getAdminAccessToken } from './token-generation';
+
 // Auth exports
 export {
   verifyIdToken,
