@@ -1,6 +1,6 @@
 {
   "name": "@intuitive-perception/firebase-admin-sdk-v8",
-  "version": "2.11.3",
+  "version": "2.11.4",
   "description": "Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs with support for the Firebase emulators for local development",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
