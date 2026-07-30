@@ -2,13 +2,13 @@
  * Tests for token-generation.ts
  * Tests JWT creation, OAuth token exchange, and token caching
  */
-
-import { getAdminAccessToken, clearTokenCache } from './token-generation';
+import { getAdminAccessToken, clearTokenCache, InMemoryAdminAccessTokenStore } from './token-generation';
 import type { ServiceAccount, TokenResponse } from './types';
 
 // Mock service-account module
 jest.mock('./service-account');
 import { getServiceAccount } from './service-account';
+import { getAdminTokenStore } from './config';
 const mockGetServiceAccount = getServiceAccount as jest.MockedFunction<typeof getServiceAccount>;
 
 describe('Token Generation', () => {
@@ -39,6 +39,10 @@ MzEfYyjiWA4R4/M2bS1+fWIcPm15j9QMQKL0hP4KZm6/Zyqrq3FGj6O6/zFvpvlI
     sign: jest.Mock;
   };
 
+  beforeAll(() => {
+    jest.spyOn(InMemoryAdminAccessTokenStore, 'getInstance').mockReturnValue(InMemoryAdminAccessTokenStore.getInstance());
+  })
+
   beforeEach(() => {
     jest.clearAllMocks();
     clearTokenCache();
@@ -65,6 +69,49 @@ MzEfYyjiWA4R4/M2bS1+fWIcPm15j9QMQKL0hP4KZm6/Zyqrq3FGj6O6/zFvpvlI
 
   afterEach(() => {
     clearTokenCache();
+  });
+
+  describe('Default Admin Token Store Class: InMemoryAdminAccessTokenStore', () => {
+    const mockTokenResponse: TokenResponse = {
+      access_token: 'test-access-token',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    };
+
+    beforeEach(() => {
+      clearTokenCache();
+    });
+
+    it('should initialize with the getInstance method and be of type InMemoryAdminAccessTokenStore', () => {
+      const tokenStore = getAdminTokenStore();
+
+      expect(InMemoryAdminAccessTokenStore.getInstance).toHaveBeenCalled();
+      expect(tokenStore).toBeInstanceOf(InMemoryAdminAccessTokenStore);
+    });
+
+    it('should call set without errors', async () => {
+      const tokenStore = getAdminTokenStore();
+      
+      await expect(tokenStore.set(mockTokenResponse)).resolves.not.toThrow();
+    });
+
+    it('should get the same token it was set with', async () => {
+      const tokenStore = getAdminTokenStore();
+      await tokenStore.set(mockTokenResponse);
+      expect(await getAdminAccessToken()).toBe(mockTokenResponse.access_token);
+    });
+
+    it('clearTokenCache should clear the TokenStore\'s admin access token', async () => {
+      const tokenStore = getAdminTokenStore();
+      await tokenStore.set(mockTokenResponse);
+      let tok1 = await getAdminAccessToken()
+
+      expect(tok1).toBeDefined();
+      clearTokenCache();
+
+      let tok2 = await getAdminAccessToken();
+      expect(tok2).not.toBe(tok1);
+    });
   });
 
   describe('getAdminAccessToken', () => {
@@ -425,15 +472,6 @@ MzEfYyjiWA4R4/M2bS1+fWIcPm15j9QMQKL0hP4KZm6/Zyqrq3FGj6O6/zFvpvlI
     });
   });
 });
-
-
-
-
-
-
-
-
-
 
 
 

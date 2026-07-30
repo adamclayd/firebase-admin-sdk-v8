@@ -551,7 +551,7 @@ const token = await getAdminAccessToken();
 const token = await getAdminAccessToken(true);
 ```
 
-#### Adding Custom Token Store
+#### Adding Custom Token Cache Store
 If you need to use a different cache for the admin access token, you can provide your own implementation of `CacheAdminAccessTokenStore` to the `initializeApp()` function. The default assigns it to one variable in memory and will expire in exp - 60 seconds. The default will not work in a worker environment like Cloudflare because the variable will not persist between requests. See the example below:
 
 ```typescript
@@ -559,8 +559,8 @@ import { initializeApp } from '@intuitive-perception/firebase-admin-sdk-v8';
 import { CacheAdminAccessTokenStore, TokenResponse } from '@intuitive-perception/firebase-admin-sdk-v8';
 import { Redis } from "@upstash/redis/cloudflare";
 
-class RedisTokenStore implements CacheAdminAccessTokenStore {
-  constructor(private redis: Redis) {}
+class RedisTokenStore extends CacheAdminAccessTokenStore {
+  protected constructor(private redis: Redis) {}
 
   async get(): Promise<string | null> {
     return await this.redis.getex('firebase:admin-access-token');
@@ -583,7 +583,7 @@ export default {
       apiKey: env.FIREBASE_API_KEY,
 
       // provide your custom token store
-      cachedAdminAccessTokenStore: new RedisTokenStore(Redis.fromEnv(env)),
+      cachedAdminAccessTokenStore: RedisTokenStore.getinstance(Redis.fromEnv(env)),
     });
 
     // use firebase-admin-sdk-v8
@@ -591,7 +591,14 @@ export default {
 }
 ```
 
-Your app will now use the Cloudflare Redis instance for admin access token caching.
+Your app will now use the Cloudflare Redis instance for admin access token caching. If your app is hosted in a stateless mannor you would want to make a custom implemention because the admin token is not cahced in a stateless environment. So it would have to generate a new admin access token for every call. Implementing it would keep your server call from having to make an extra api request.
+
+ - Implemention
+   - `consturctor` must be protected.
+   - All implementations come with a static `getInstance` method inherited from the abstract base class that will return the saved instance or a new instance of the token store so that there is only ever one instance of it implemented. You can pass whatever parameters that your constructor accepts to it.
+   - `get` must be implemented with no parameters
+   - `set` must be implemented with a single `TokenResponse` parameter
+   - `clear` must be implemented with no parameters
 
 #### Clearing Admin Access Token Cache
 ```typescript

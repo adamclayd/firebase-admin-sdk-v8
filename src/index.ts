@@ -4,9 +4,9 @@
  */
 
 // Configuration exports
-export { initializeApp, getConfig, clearConfig, getCachedAdminAccessTokenStore as getAdminTokenStore } from './config';
+export { initializeApp, getConfig, clearConfig } from './config';
 
-export { getAdminAccessToken } from './token-generation';
+export { getAdminAccessToken, CacheAdminAccessTokenStore, clearTokenCache } from './token-generation';
 
 // Auth exports
 export {
@@ -95,7 +95,6 @@ export type {
   UpdateUserRequest,
   ListUsersResult,
   ActionCodeSettings,
-  CacheAdminAccessTokenStore
 } from './types';
 
 // Messaging type exports
@@ -122,3 +121,4 @@ export type {
   SignedUrlOptions,
   ResumableUploadOptions,
 } from './storage';
+

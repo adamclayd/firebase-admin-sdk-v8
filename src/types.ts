@@ -348,8 +348,3 @@ export interface ActionCodeSettings {
   linkDomain?: string;
 }
 
-export interface CacheAdminAccessTokenStore {
-  get(): Promise<string | null>;
-  set(data: TokenResponse): Promise<void>;
-  clear(): Promise<void>;
-}

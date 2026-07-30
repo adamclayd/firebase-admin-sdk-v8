@@ -5,7 +5,7 @@
 
 import type { ServiceAccount, TokenResponse } from './types';
 import { getServiceAccount } from './service-account';
-import { getCachedAdminAccessTokenStore } from './config';
+import { getAdminTokenStore } from './config';
 /**
  * Base64URL encode a string
  */
@@ -102,7 +102,7 @@ export async function getAdminAccessToken(emulated = false): Promise<string> {
     return 'owner';
   }
 
-  const tokenStore = getCachedAdminAccessTokenStore();
+  const tokenStore = getAdminTokenStore();
 
   const cachedAccessToken = await tokenStore.get();
   if (cachedAccessToken) {
@@ -132,4 +132,48 @@ export async function getAdminAccessToken(emulated = false): Promise<string> {
   
 
   return (await tokenStore.get())!;
+}
+
+export abstract class CacheAdminAccessTokenStore {
+  protected constructor() {}
+
+  static getInstance<T extends CacheAdminAccessTokenStore>(...args: any[]): T {
+    return new (this as any)(...args) as T;
+  }
+
+  abstract get(): Promise<string | undefined>
+
+  abstract set(data: TokenResponse): Promise<void>;
+  
+  abstract clear(): Promise<void>;
+}
+
+export class InMemoryAdminAccessTokenStore extends CacheAdminAccessTokenStore {
+  private cachedAccessToken: string | undefined = undefined;
+  private expiryTime: number = 0;
+
+  protected constructor() {
+    super();
+  }
+  
+  async get(): Promise<string | undefined> {
+    if(this.cachedAccessToken && Date.now() < this.expiryTime)
+      return this.cachedAccessToken;
+
+    return undefined;
+  }
+
+  async set(data: TokenResponse): Promise<void> {
+    this.cachedAccessToken = data.access_token;
+    this.expiryTime = Date.now() + (data.expires_in * 1000) - 60_000;
+  }
+
+  async clear(): Promise<void> {
+    this.cachedAccessToken = undefined;
+    this.expiryTime = 0;
+  }
+}
+
+export function clearTokenCache() {
+  getAdminTokenStore().clear()
 }

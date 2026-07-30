@@ -3,7 +3,8 @@
  * Manages SDK configuration and credentials
  */
 
-import type { CacheAdminAccessTokenStore, ServiceAccount, TokenResponse } from './types';
+import { InMemoryAdminAccessTokenStore, CacheAdminAccessTokenStore } from './token-generation';
+import type { ServiceAccount } from './types';
 
 /**
  * SDK Configuration
@@ -149,30 +150,7 @@ export function getProjectId(): string {
   );
 }
 
-class InMemoryCacheAdminAccessTokenStore implements CacheAdminAccessTokenStore {
-  private cachedAccessToken: string | null = null;
-  private expiryTime: number = 0;
-  
 
-  async get(): Promise<string | null> {
-    if(this.cachedAccessToken && Date.now() < this.expiryTime)
-      return this.cachedAccessToken;
-
-    return null;
-  }
-
-  async set(data: TokenResponse): Promise<void> {
-    this.cachedAccessToken = data.access_token;
-    this.expiryTime = Date.now() + (data.expires_in * 1000) - 60000;
-  }
-
-  async clear(): Promise<void> {
-    this.cachedAccessToken = null;
-    this.expiryTime = 0;
-  }
-}
-
-const defaultCacheAdminAccessTokenStore: CacheAdminAccessTokenStore = new InMemoryCacheAdminAccessTokenStore();
 
 
 /**
@@ -215,6 +193,6 @@ export function getStorageEmulatorHost() {
   return globalConfig.storageEmulatorHost ? globalConfig.storageEmulatorHost : process?.env.FIREBASE_STORAGE_EMULATOR_HOST;
 }
 
-export function getCachedAdminAccessTokenStore(): CacheAdminAccessTokenStore {
-  return globalConfig.cachedAdminAccessTokenStore ?? defaultCacheAdminAccessTokenStore;
+export function getAdminTokenStore(): CacheAdminAccessTokenStore {
+  return globalConfig.cachedAdminAccessTokenStore ?? InMemoryAdminAccessTokenStore.getInstance();
 }
