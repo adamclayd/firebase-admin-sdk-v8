@@ -594,11 +594,11 @@ export default {
 Your app will now use the Cloudflare Redis instance for admin access token caching. If your app is hosted in a stateless mannor you would want to make a custom implemention because the admin token is not cahced in a stateless environment. So it would have to generate a new admin access token for every call. Implementing it would keep your server call from having to make an extra api request.
 
  - Implemention
-   - `consturctor` must be protected.
-   - All implementations come with a static `getInstance` method inherited from the abstract base class that will return the saved instance or a new instance of the token store so that there is only ever one instance of it implemented. You can pass whatever parameters that your constructor accepts to it.
-   - `get` must be implemented with no parameters
-   - `set` must be implemented with a single `TokenResponse` parameter
-   - `clear` must be implemented with no parameters
+   - `constuctor` must accept at least a token parameter of type `symbol` as its first parameter to be passed to the base class constructor. This is to ensure that no child classes get initialiated directly with the `new` operator
+   - All implementations come with a static `getInstance` method inherited from the abstract base class that will return the saved instance or a new instance of the token store so that there is only ever one instance of it implemented. You can pass whatever additional parameters that your constructor accepts to it.
+   - `get` must be implemented with no parameters and must return a `Promise<string | undefined>`
+   - `set` must be implemented with a single `TokenResponse` parameter and must return a `Promise<void>`
+   - `clear` must be implemented with no parameters and must return a `Promise<void>`
 
 #### Clearing Admin Access Token Cache
 ```typescript

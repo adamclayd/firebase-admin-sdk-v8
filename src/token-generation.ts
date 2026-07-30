@@ -134,11 +134,20 @@ export async function getAdminAccessToken(emulated = false): Promise<string> {
   return (await tokenStore.get())!;
 }
 
+const ADMIN_STORE_CONSTRUCTOR_TOKEN = Symbol('Internal Constructor Guard CacheAdminAccessTokenStore');
+
+/**
+ * Abstract base class for caching admin access tokens
+ */
 export abstract class CacheAdminAccessTokenStore {
-  protected constructor() {}
+  protected constructor(token: symbol) {
+    if (token !== ADMIN_STORE_CONSTRUCTOR_TOKEN) {
+      throw new Error(`Direct instantiation of ${this.constructor.name} is not allowed. Use getInstance() instead.`);
+    }
+  }
 
   static getInstance<T extends CacheAdminAccessTokenStore>(...args: any[]): T {
-    return new (this as any)(...args) as T;
+    return new (this as any)(ADMIN_STORE_CONSTRUCTOR_TOKEN, ...args) as T;
   }
 
   abstract get(): Promise<string | undefined>
@@ -148,12 +157,15 @@ export abstract class CacheAdminAccessTokenStore {
   abstract clear(): Promise<void>;
 }
 
+/**
+ * Implementation of CacheAdminAccessTokenStore for in-memory caching to a single variable
+ */
 export class InMemoryAdminAccessTokenStore extends CacheAdminAccessTokenStore {
   private cachedAccessToken: string | undefined = undefined;
   private expiryTime: number = 0;
 
-  protected constructor() {
-    super();
+  protected constructor(token: symbol) {
+    super(token);
   }
   
   async get(): Promise<string | undefined> {
