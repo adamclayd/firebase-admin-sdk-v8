@@ -560,7 +560,7 @@ import { CacheAdminAccessTokenStore, TokenResponse } from '@intuitive-perception
 import { Redis } from "@upstash/redis/cloudflare";
 
 class RedisTokenStore extends CacheAdminAccessTokenStore {
-  protected constructor(private redis: Redis) {}
+  protected constructor(token: symbol, private redis: Redis) {}
 
   async get(): Promise<string | null> {
     return await this.redis.getex('firebase:admin-access-token');
