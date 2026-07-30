@@ -139,15 +139,17 @@ const ADMIN_STORE_CONSTRUCTOR_TOKEN = Symbol('Internal Constructor Guard CacheAd
 /**
  * Abstract base class for caching admin access tokens
  */
-export abstract class CacheAdminAccessTokenStore {
+export abstract class AdminTokenStore {
   protected constructor(token: symbol) {
-    if (token !== ADMIN_STORE_CONSTRUCTOR_TOKEN) {
+    if (token !== ADMIN_STORE_CONSTRUCTOR_TOKEN)
       throw new Error(`Direct instantiation of ${this.constructor.name} is not allowed. Use getInstance() instead.`);
-    }
   }
 
-  static getInstance<T extends CacheAdminAccessTokenStore>(...args: any[]): T {
-    return new (this as any)(ADMIN_STORE_CONSTRUCTOR_TOKEN, ...args) as T;
+  static getInstance<T extends abstract new(...args: any[]) => any>(this: T, ...args: any[]) {
+    if (this.constructor === AdminTokenStore)
+      throw new Error('Cannot initiate instance of abstract class CacheAdminAccessTokenStore');
+
+    return new (this as any)(ADMIN_STORE_CONSTRUCTOR_TOKEN, ...args) as InstanceType<T>;
   }
 
   abstract get(): Promise<string | undefined>
@@ -160,11 +162,11 @@ export abstract class CacheAdminAccessTokenStore {
 /**
  * Implementation of CacheAdminAccessTokenStore for in-memory caching to a single variable
  */
-export class InMemoryAdminAccessTokenStore extends CacheAdminAccessTokenStore {
+export class InMemoryAdminAccessTokenStore extends AdminTokenStore {
   private cachedAccessToken: string | undefined = undefined;
   private expiryTime: number = 0;
 
-  protected constructor(token: symbol) {
+  constructor(token: symbol) {
     super(token);
   }
   

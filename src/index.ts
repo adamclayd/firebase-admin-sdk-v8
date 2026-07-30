@@ -6,7 +6,7 @@
 // Configuration exports
 export { initializeApp, getConfig, clearConfig } from './config';
 
-export { getAdminAccessToken, CacheAdminAccessTokenStore, clearTokenCache } from './token-generation';
+export { getAdminAccessToken, AdminTokenStore, clearTokenCache } from './token-generation';
 
 // Auth exports
 export {

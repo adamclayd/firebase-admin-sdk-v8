@@ -3,7 +3,7 @@
  * Manages SDK configuration and credentials
  */
 
-import { InMemoryAdminAccessTokenStore, CacheAdminAccessTokenStore } from './token-generation';
+import { InMemoryAdminAccessTokenStore, AdminTokenStore } from './token-generation';
 import type { ServiceAccount } from './types';
 
 /**
@@ -16,7 +16,7 @@ interface SDKConfig {
   authEmulatorHost?: string;
   firestoreEmulatorHost?: string;
   storageEmulatorHost?: string;
-  cachedAdminAccessTokenStore?: CacheAdminAccessTokenStore;
+  cachedAdminAccessTokenStore?: AdminTokenStore;
 }
 
 /**
@@ -193,6 +193,6 @@ export function getStorageEmulatorHost() {
   return globalConfig.storageEmulatorHost ? globalConfig.storageEmulatorHost : process?.env.FIREBASE_STORAGE_EMULATOR_HOST;
 }
 
-export function getAdminTokenStore(): CacheAdminAccessTokenStore {
+export function getAdminTokenStore(): AdminTokenStore {
   return globalConfig.cachedAdminAccessTokenStore ?? InMemoryAdminAccessTokenStore.getInstance();
 }
