@@ -12,16 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Default in-memory token store with 1-hour expiration
   - Custom implementations can be provided via `initializeApp()` config
   - Example implementation for Cloudflare Workers using Redis (Upstash)
-
-### Changed
-- Updated `initializeApp()` config to accept `cachedAdminAccessTokenStore` option
-- Updated `initializeApp()` documentation to include custom token store usage examples
-- Token store now stores `TokenResponse` (with `access_token` and `expires_in`) instead of just token string
-- Default admin access token caching set a variable in memory to cache and will expire in `expires_in` - 60 seconds.
-- Default admin access token caching will not persist between worker requests in a worker environment. So If the developer would like cahcing the admin access token between worker requests they should provide a custom token store implementation to the `cachedAdminAccessTokenStore` option in `initializeApp()` config.
-
-## [2.10.0] - 2026-07-22
-### Added
 - **Emulator Support**: Added support for Firestore, Auth, and Storage emulators
   - `authEmulatorHost` in `initializeApp()` config for Auth emulator
   - `firestoreEmulatorHost` in `initializeApp()` config for Firestore emulator
@@ -35,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports `ActionCodeSettings` for custom continue URLs, mobile deep linking (iOS/Android), and custom hosting domains
   - Returns the OOB link for sending via custom email delivery
   - unit and e2e tests for emulated Auth and Unemulated Auth
+
+### Changed
+- Updated `initializeApp()` config to accept `cachedAdminAccessTokenStore` option
+- Updated `initializeApp()` documentation to include custom token store usage examples
+- Token store now stores `TokenResponse` (with `access_token` and `expires_in`) instead of just token string
+- Default admin access token caching set a variable in memory to cache and will expire in `expires_in` - 60 seconds.
+- Default admin access token caching will not persist between worker requests in a worker environment. So If the developer would like cahcing the admin access token between worker requests they should provide a custom token store implementation to the `cachedAdminAccessTokenStore` option in `initializeApp()` config.
 
 ## [2.9.0] - 2026-03-19
 
