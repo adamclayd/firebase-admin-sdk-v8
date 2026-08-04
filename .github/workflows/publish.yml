@@ -74,9 +74,9 @@ jobs:
           if [ "${{ steps.version.outputs.changed }}" == "true" ]; then
             echo "### 📦 Published to npm" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Package**: \`@intuitive-perception/firebase-admin-sdk-v8@${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Package**: \`@adamclayd/firebase-admin@${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "[View on npm](https://www.npmjs.com/package/@intuitive-perception/firebase-admin-sdk-v8/v/${{ steps.version.outputs.version }})" >> "$GITHUB_STEP_SUMMARY"
+            echo "[View on npm](https://www.npmjs.com/package/@adamclayd/firebase-admin/v/${{ steps.version.outputs.version }})" >> "$GITHUB_STEP_SUMMARY"
           else
             CURRENT=$(node -p "require('./package.json').version")
             echo "### ⏭️ Publish skipped" >> "$GITHUB_STEP_SUMMARY"
