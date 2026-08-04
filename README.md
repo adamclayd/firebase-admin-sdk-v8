@@ -1,4 +1,4 @@
-# Firebase Admin SDK v8
+# Firebase Admin
 
 > Firebase Admin SDK for Cloudflare Workers and edge runtimes using REST APIs
 
