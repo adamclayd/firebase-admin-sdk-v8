@@ -285,11 +285,13 @@ export async function uploadFileResumable(
   let chunkSize = options.chunkSize || 256 * 1024; // 256KB default
   
   // The Firebase Storage emulator does not properly support chunked resumable
-  // uploads and will return 200 OK on the first chunk. We must upload in a single chunk.
-  if (getStorageEmulatorHost() && options.totalSize) {
-    chunkSize = Math.max(chunkSize, options.totalSize);
+  // uploads and will return 200 OK on the first chunk. Force a single chunk.
+  if (getStorageEmulatorHost()) {
+    const total = options.totalSize
+      ?? (data instanceof ReadableStream ? undefined : (data as any).byteLength ?? (data as Blob).size);
+    if (total) chunkSize = Math.max(chunkSize, total);
   }
-  
+
   // Check if data is a ReadableStream
   if (data instanceof ReadableStream) {
     return await uploadFromStream(bucket, path, data, contentType, chunkSize, options);
@@ -298,10 +300,6 @@ export async function uploadFileResumable(
   // Convert to ArrayBuffer for non-stream data
   const buffer = await toArrayBuffer(data);
   const total = buffer.byteLength;
-  
-  if (getStorageEmulatorHost()) {
-    chunkSize = Math.max(chunkSize, total);
-  }
   
   // Initiate or resume session
   let sessionUri = options.resumeToken;

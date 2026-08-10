@@ -552,10 +552,12 @@ describe('Emulated Resumable Uploads', () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should upload large file in multiple chunks', async () => {
+    it('should collapse a would-be multi-chunk upload into a single chunk', async () => {
+      // The emulator does not support chunked resumable uploads, so the client
+      // forces the upload into a single chunk regardless of options.chunkSize.
       const sessionUri = `http://${EMU_HOST}/upload/storage/v1/b/bucket/o?uploadId=123`;
-      const chunkSize = 10; // Small chunk for testing
-      const data = new Uint8Array(25); // 25 bytes = 3 chunks
+      const chunkSize = 10; // Requested — should be ignored under emulator
+      const data = new Uint8Array(25);
 
       // Mock initiation
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -563,17 +565,7 @@ describe('Emulated Resumable Uploads', () => {
         headers: new Map([ [ 'Location', sessionUri ] ]),
       });
 
-      // Mock first chunk (incomplete)
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
-      });
-
-      // Mock second chunk (incomplete)
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
-      });
-
-      // Mock third chunk (complete)
+      // Single collapsed chunk (complete)
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         status: 200,
         json: async () => ({
@@ -592,10 +584,12 @@ describe('Emulated Resumable Uploads', () => {
       );
 
       expect(result.name).toBe('large.bin');
-      expect(global.fetch).toHaveBeenCalledTimes(4); // 1 init + 3 chunks
+      expect(global.fetch).toHaveBeenCalledTimes(2); // 1 init + 1 collapsed chunk
+      const chunkCall = (global.fetch as jest.Mock).mock.calls[ 1 ];
+      expect(chunkCall[ 1 ].headers[ 'Content-Range' ]).toBe('bytes 0-24/25');
     });
 
-    it('should call progress callback', async () => {
+    it('should call progress callback once for the collapsed single chunk', async () => {
       const sessionUri = `http://${EMU_HOST}/upload/storage/v1/b/bucket/o?uploadId=123`;
       const onProgress = jest.fn();
       const data = new Uint8Array(20);
@@ -606,12 +600,7 @@ describe('Emulated Resumable Uploads', () => {
         headers: new Map([ [ 'Location', sessionUri ] ]),
       });
 
-      // Mock first chunk (incomplete)
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
-      });
-
-      // Mock second chunk (complete)
+      // Single collapsed chunk (complete)
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         status: 200,
         json: async () => ({
@@ -627,12 +616,11 @@ describe('Emulated Resumable Uploads', () => {
         { chunkSize: 10, onProgress }
       );
 
-      expect(onProgress).toHaveBeenCalledTimes(2);
-      expect(onProgress).toHaveBeenCalledWith(10, 20);
+      expect(onProgress).toHaveBeenCalledTimes(1);
       expect(onProgress).toHaveBeenCalledWith(20, 20);
     });
 
-    it('should resume from previous session', async () => {
+    it('should resume from previous session and upload the remainder as a single chunk', async () => {
       const sessionUri = `http://${EMU_HOST}/upload/storage/v1/b/bucket/o?uploadId=123`;
       const data = new Uint8Array(30);
 
@@ -642,11 +630,7 @@ describe('Emulated Resumable Uploads', () => {
         headers: new Map([ [ 'Range', 'bytes=0-9' ] ]),
       });
 
-      // Mock remaining chunks
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
-      });
-
+      // Remaining bytes uploaded as a single collapsed chunk (complete)
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         status: 200,
         json: async () => ({
@@ -663,10 +647,14 @@ describe('Emulated Resumable Uploads', () => {
         { chunkSize: 10, resumeToken: sessionUri, onProgress }
       );
 
-      // Should start from byte 10
-      expect(onProgress).toHaveBeenCalledWith(10, 30); // Resume position
-      expect(onProgress).toHaveBeenCalledWith(20, 30); // After chunk 2
-      expect(onProgress).toHaveBeenCalledWith(30, 30); // Complete
+      // Resume position, then completion — no intermediate chunk boundary under emulator
+      expect(onProgress).toHaveBeenCalledTimes(2);
+      expect(onProgress).toHaveBeenNthCalledWith(1, 10, 30);
+      expect(onProgress).toHaveBeenNthCalledWith(2, 30, 30);
+
+      // The single remaining chunk covers bytes 10-29
+      const chunkCall = (global.fetch as jest.Mock).mock.calls[ 1 ];
+      expect(chunkCall[ 1 ].headers[ 'Content-Range' ]).toBe('bytes 10-29/30');
     });
 
     it('should handle Blob data', async () => {
@@ -791,17 +779,13 @@ describe('Emulated Resumable Uploads', () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle Content-Range headers correctly', async () => {
+    it('should send a single Content-Range covering the whole file under emulator', async () => {
       const sessionUri = `http://${EMU_HOST}/upload/storage/v1/b/bucket/o?uploadId=123`;
       const data = new Uint8Array(20);
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         headers: new Map([ [ 'Location', sessionUri ] ]),
-      });
-
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
       });
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -813,14 +797,12 @@ describe('Emulated Resumable Uploads', () => {
         'test.bin',
         data,
         'application/octet-stream',
-        { chunkSize: 10 }
+        { chunkSize: 10 } // Ignored under emulator
       );
 
+      expect(global.fetch).toHaveBeenCalledTimes(2);
       const chunkCall = (global.fetch as jest.Mock).mock.calls[ 1 ];
-      expect(chunkCall[ 1 ].headers[ 'Content-Range' ]).toBe('bytes 0-9/20');
-
-      const chunkCall2 = (global.fetch as jest.Mock).mock.calls[ 2 ];
-      expect(chunkCall2[ 1 ].headers[ 'Content-Range' ]).toBe('bytes 10-19/20');
+      expect(chunkCall[ 1 ].headers[ 'Content-Range' ]).toBe('bytes 0-19/20');
     });
   });
 
@@ -862,17 +844,15 @@ describe('Emulated Resumable Uploads', () => {
       expect(result.name).toBe('stream.bin');
     });
 
-    it('should upload large stream in multiple chunks', async () => {
+    it('should drain the stream into a single collapsed chunk under emulator', async () => {
       const sessionUri = `http://${EMU_HOST}/upload/storage/v1/b/bucket/o?uploadId=123`;
-      const chunkSize = 262144; // 256KB
-      const totalSize = chunkSize * 2; // Exactly 2 chunks for simpler test
+      const chunkSize = 262144; // 256KB — requested; ignored under emulator
+      const totalSize = chunkSize * 2;
 
-      // Create a ReadableStream that emits exactly 2 chunks
+      // Stream that would normally be read as 2 chunks
       const stream = new ReadableStream({
         start(controller) {
-          // Emit first chunk
           controller.enqueue(new Uint8Array(chunkSize));
-          // Emit second chunk
           controller.enqueue(new Uint8Array(chunkSize));
           controller.close();
         },
@@ -884,12 +864,7 @@ describe('Emulated Resumable Uploads', () => {
         headers: new Map([ [ 'Location', sessionUri ] ]),
       });
 
-      // Mock first chunk (incomplete)
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        status: 308,
-      });
-
-      // Mock second chunk (complete)
+      // Single collapsed chunk (complete)
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         status: 200,
         json: async () => ({
@@ -907,7 +882,9 @@ describe('Emulated Resumable Uploads', () => {
 
       expect(result).toBeDefined();
       expect(result.name).toBe('large-stream.bin');
-      expect(global.fetch).toHaveBeenCalledTimes(3); // 1 init + 2 chunks
+      expect(global.fetch).toHaveBeenCalledTimes(2); // 1 init + 1 collapsed chunk
+      const chunkCall = (global.fetch as jest.Mock).mock.calls[ 1 ];
+      expect(chunkCall[ 1 ].headers[ 'Content-Range' ]).toBe(`bytes 0-${totalSize - 1}/${totalSize}`);
     });
 
     it('should call progress callback for stream uploads', async () => {

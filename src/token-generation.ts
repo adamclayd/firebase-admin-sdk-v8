@@ -148,9 +148,17 @@ export abstract class AdminTokenStore {
   static getInstance<T extends abstract new(...args: any[]) => any>(this: T, ...args: any[]) {
     if (this.constructor === AdminTokenStore)
       throw new Error('Cannot initiate instance of abstract class CacheAdminAccessTokenStore');
+    
+    if(AdminTokenStore.instance && AdminTokenStore.instance instanceof this)
+      return AdminTokenStore.instance as InstanceType<T>;
 
-    return new (this as any)(ADMIN_STORE_CONSTRUCTOR_TOKEN, ...args) as InstanceType<T>;
+
+
+    AdminTokenStore.instance = new (this as any)(ADMIN_STORE_CONSTRUCTOR_TOKEN, ...args);
+    return AdminTokenStore.instance as InstanceType<T>;
   }
+
+  private static instance: AdminTokenStore | undefined = undefined;
 
   abstract get(): Promise<string | undefined>
 

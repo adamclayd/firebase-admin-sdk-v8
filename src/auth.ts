@@ -429,7 +429,7 @@ export async function createCustomToken(
 
 
   // Sign with private key
-  const signature =  emuHost ? 'firebase-admin-sdk-v8-mock-signature' : await signWithPrivateKey(unsignedToken, getServiceAccount().private_key);
+  const signature =  emuHost ? base64UrlEncode('firebase-admin-sdk-v8-mock-signature') : await signWithPrivateKey(unsignedToken, getServiceAccount().private_key);
   
   return `${unsignedToken}.${signature}`;
 }
